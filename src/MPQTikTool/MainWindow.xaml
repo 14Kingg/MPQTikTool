@@ -1,0 +1,68 @@
+<Window x:Class="MPQTikTool.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="MPQ Tik Tool" Height="820" Width="1320" MinHeight="600" MinWidth="960"
+        Background="#FF171A20" Foreground="#FFE8ECF2" WindowStartupLocation="CenterScreen">
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Background="#FF20242C" Padding="12">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="打开地图" Padding="18,8" Margin="0,0,8,0" Click="OpenMap_Click"/>
+                    <Button Content="导出选中" Padding="18,8" Margin="0,0,8,0" Click="ExportSelected_Click"/>
+                    <Button Content="全部导出" Padding="18,8" Click="ExportAll_Click"/>
+                </StackPanel>
+                <TextBlock x:Name="MapPathText" Text="未打开地图" VerticalAlignment="Center" Margin="20,0,0,0" Foreground="#FF9BA7B8"/>
+            </DockPanel>
+        </Border>
+        <StatusBar DockPanel.Dock="Bottom" Background="#FF20242C" Foreground="#FFB9C2D0">
+            <StatusBarItem><TextBlock x:Name="StatusText" Text="就绪"/></StatusBarItem>
+        </StatusBar>
+        <Grid Margin="12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.1*"/>
+                <ColumnDefinition Width="3*"/>
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
+            <DockPanel Grid.ColumnSpan="2" Margin="0,0,0,10">
+                <TextBox x:Name="SearchBox" Width="300" Padding="8" VerticalContentAlignment="Center"
+                         ToolTip="搜索文件名、扩展名或资源类型" TextChanged="SearchBox_TextChanged"/>
+                <ComboBox x:Name="CategoryBox" Width="160" Margin="8,0,0,0" Padding="6"
+                          SelectionChanged="CategoryBox_SelectionChanged">
+                    <ComboBoxItem Content="全部类型" IsSelected="True"/>
+                    <ComboBoxItem Content="图片"/><ComboBoxItem Content="模型"/>
+                    <ComboBoxItem Content="音频"/><ComboBoxItem Content="文本/脚本"/>
+                    <ComboBoxItem Content="物编数据"/><ComboBoxItem Content="其他"/>
+                </ComboBox>
+                <TextBlock x:Name="CountText" Margin="14,0" VerticalAlignment="Center" Foreground="#FF9BA7B8"/>
+            </DockPanel>
+            <DataGrid x:Name="EntriesGrid" Grid.Row="1" Grid.Column="0" AutoGenerateColumns="False"
+                      IsReadOnly="True" SelectionMode="Single" SelectionChanged="EntriesGrid_SelectionChanged"
+                      Background="#FF20242C" Foreground="#FFE8ECF2" RowBackground="#FF20242C"
+                      AlternatingRowBackground="#FF262C36" BorderBrush="#FF343B48" GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="资源名称" Binding="{Binding Name}" Width="*"/>
+                    <DataGridTextColumn Header="类型" Binding="{Binding Category}" Width="90"/>
+                    <DataGridTextColumn Header="大小" Binding="{Binding DisplaySize}" Width="85"/>
+                </DataGrid.Columns>
+            </DataGrid>
+            <Border Grid.Row="1" Grid.Column="1" Margin="10,0,0,0" Background="#FF20242C" BorderBrush="#FF343B48" BorderThickness="1" Padding="12">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
+                        <TextBlock x:Name="PreviewName" Text="资源预览" FontSize="18" FontWeight="SemiBold"/>
+                        <TextBlock x:Name="PreviewInfo" Foreground="#FF9BA7B8" Margin="0,5,0,0" TextWrapping="Wrap"/>
+                    </StackPanel>
+                    <Grid>
+                        <TextBox x:Name="TextPreview" Visibility="Collapsed" IsReadOnly="True" TextWrapping="NoWrap"
+                                 AcceptsReturn="True" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"
+                                 Background="#FF15181E" Foreground="#FFD6E0ED" BorderThickness="0" FontFamily="Consolas"/>
+                        <ScrollViewer x:Name="ImageScroll" Visibility="Collapsed" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                            <Image x:Name="ImagePreview" Stretch="Uniform" />
+                        </ScrollViewer>
+                        <TextBlock x:Name="FallbackPreview" Text="选择左侧资源以查看预览" TextWrapping="Wrap"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FF9BA7B8" FontSize="15"/>
+                    </Grid>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>
