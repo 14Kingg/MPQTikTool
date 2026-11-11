@@ -5,6 +5,13 @@
 
 不再依赖 StormLib 原生 DLL。MPQ 读取由仓库内纯 C# 引擎 `src/MPQTikTool/Services/MpqArchive.cs` 完成。
 
+
+## 完整逆向还原路线
+
+项目实施路线与逐项验收标准见 [docs/ROADMAP_AND_ACCEPTANCE.md](docs/ROADMAP_AND_ACCEPTANCE.md)，覆盖 MPQ v1-v4/HET/BET、压缩与加密、资源和地图结构、工程重建、逐项校验、脚本与私有容器分析，以及 UI 工作台要求。
+
+当前 UI 已增加「资源浏览 / MPQ 结构 / 地图结构 / 工程重建 / 逆向分析」工作区入口。其中后四个页面目前是能力范围与状态说明界面，不代表对应解析器、依赖图或重建功能已经实现；功能状态以代码和自动化测试为准。
+
 ## 下载与运行
 
 1. 打开仓库 **Releases**，下载 `MPQTikTool-win-x64.zip`。
