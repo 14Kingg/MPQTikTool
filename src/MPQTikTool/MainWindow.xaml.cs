@@ -13,6 +13,7 @@ namespace MPQTikTool;
 public partial class MainWindow : Window
 {
     private readonly MpqArchiveService _archive = new();
+    private string? _audioTempPath;
     private readonly ObservableCollection<ArchiveEntry> _visibleEntries = new();
     private List<ArchiveEntry> _allEntries = new();
 
@@ -103,6 +104,18 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (entry.Extension is ".wav" or ".mp3")
+            {
+                var bytes = _archive.ReadAllBytes(entry);
+                _audioTempPath = Path.Combine(Path.GetTempPath(), "MPQTikTool", Guid.NewGuid().ToString("N") + entry.Extension);
+                Directory.CreateDirectory(Path.GetDirectoryName(_audioTempPath)!);
+                File.WriteAllBytes(_audioTempPath, bytes);
+                AudioPlayer.Source = new Uri(_audioTempPath);
+                AudioPanel.Visibility = Visibility.Visible;
+                AudioStatus.Text = "音频已加载，点击播放";
+                return;
+            }
+
             if (entry.Extension == ".blp")
             {
                 var bytes = _archive.ReadAllBytes(entry);
@@ -158,7 +171,7 @@ public partial class MainWindow : Window
             }
             sb.AppendLine();
         }
-        if (bytes.Length > maxBytes) sb.AppendLine("\\n... 已截断，导出选中可保存完整原始文件。");
+        if (bytes.Length > maxBytes) sb.AppendLine("\n... 已截断，导出选中可保存完整原始文件。");
         return sb.ToString();
     }
 
@@ -178,6 +191,14 @@ public partial class MainWindow : Window
         ImageScroll.Visibility = Visibility.Collapsed;
         FallbackPreview.Visibility = Visibility.Collapsed;
         ImagePreview.Source = null;
+        AudioPlayer.Stop();
+        AudioPlayer.Source = null;
+        AudioPanel.Visibility = Visibility.Collapsed;
+        if (_audioTempPath is not null)
+        {
+            try { File.Delete(_audioTempPath); } catch { }
+            _audioTempPath = null;
+        }
         TextPreview.Clear();
         PreviewName.Text = "资源预览";
         PreviewInfo.Text = "";
@@ -265,6 +286,24 @@ public partial class MainWindow : Window
                 "批量导出结果", MessageBoxButton.OK, MessageBoxImage.Warning);
         else
             MessageBox.Show($"已导出 {succeeded} 个文件（{exportedBytes:N0} bytes）。\n导出目录已附带 CSV 清单和结果报告。", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void AudioPlay_Click(object sender, RoutedEventArgs e)
+    {
+        try { AudioPlayer.Play(); AudioStatus.Text = "正在播放"; }
+        catch (Exception ex) { AudioStatus.Text = "播放失败：" + ex.Message; }
+    }
+
+    private void AudioPause_Click(object sender, RoutedEventArgs e)
+    {
+        AudioPlayer.Pause();
+        AudioStatus.Text = "已暂停";
+    }
+
+    private void AudioStop_Click(object sender, RoutedEventArgs e)
+    {
+        AudioPlayer.Stop();
+        AudioStatus.Text = "已停止";
     }
 
     private static string Csv(params string[] fields) =>
