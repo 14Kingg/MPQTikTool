@@ -256,6 +256,16 @@ public sealed class MpqArchive : IDisposable
 
     private byte[] ReadAt(long offset, int count) => ReadAt(_stream, offset, count);
 
+    private long GetAbsoluteOffset(ulong archiveRelativeOffset)
+    {
+        if (archiveRelativeOffset > long.MaxValue)
+            throw new InvalidDataException("MPQ 块偏移超过当前 .NET 文件流可寻址范围。");
+        var absolute = checked(_base + (long)archiveRelativeOffset);
+        if (absolute < _base || absolute > _stream.Length)
+            throw new InvalidDataException($"MPQ 块偏移越界：0x{archiveRelativeOffset:X}。");
+        return absolute;
+    }
+
     /// <summary>Matches names against hash-table entries. Locale is intentionally ignored.</summary>
     private int ApplyNames(IEnumerable<string> candidates)
     {
@@ -455,7 +465,7 @@ public sealed class MpqArchive : IDisposable
         var bufferSize = 1 << 16; // divisible by four for the MPQ block cipher
         var buffer = new byte[bufferSize];
         long remaining = wanted;
-        var offset = _base + (long)entry.FilePos;
+        var offset = GetAbsoluteOffset(entry.FilePos);
         var encrypted = IsEncrypted(entry);
         uint seed1 = 0, seed2 = 0xEEEEEEEE;
         if (encrypted)
@@ -475,7 +485,8 @@ public sealed class MpqArchive : IDisposable
             offset += chunk.Length;
             remaining -= chunk.Length;
             progress?.Report(wanted - remaining);
-            if (chunk.Length < count) break;
+            if (chunk.Length != count)
+                throw new EndOfStreamException($"块 {entry.BlockIndex} 数据被截断：需要读取 {count} B，实际读取 {chunk.Length} B。");
         }
     }
 
@@ -540,7 +551,7 @@ public sealed class MpqArchive : IDisposable
             if (end < start || end > entry.CompressedSize)
                 throw new InvalidDataException($"块 {entry.BlockIndex} 扇区 {sector} 越界。");
             var expected = (int)Math.Min(_sectorSize, entry.Size - (uint)sector * _sectorSize);
-            var data = ReadAt(_base + (long)entry.FilePos + start, checked((int)(end - start)));
+            var data = ReadAt(checked(GetAbsoluteOffset(entry.FilePos) + start), checked((int)(end - start)));
             if (encrypted) MpqHash.DecryptInPlace(data, key!.Value + (uint)sector);
             if (data.Length < expected) data = Inflate(data, expected);
             if (data.Length != expected)
