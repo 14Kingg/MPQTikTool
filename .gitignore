@@ -2,8 +2,11 @@ bin/
 obj/
 .vs/
 .vscode/
+publish/
+.workbuddy/
 *.user
 *.suo
 *.cache
 *.log
 StormLib.dll
+*.zip

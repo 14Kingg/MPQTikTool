@@ -26,17 +26,6 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Install StormLib (x64)
-        shell: pwsh
-        run: |
-          vcpkg install stormlib:x64-windows-staticcrt --overlay-triplets=.github/vcpkg-triplets
-          $bin = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-staticcrt\bin"
-          $storm = Get-ChildItem $bin -Filter StormLib.dll | Select-Object -First 1
-          if (-not $storm) {
-            throw "StormLib.dll was not produced by the vcpkg StormLib package."
-          }
-          "STORMLIB_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-
       - name: Restore
         run: dotnet restore src/MPQTikTool/MPQTikTool.csproj
 
@@ -44,22 +33,13 @@ jobs:
         run: dotnet build src/MPQTikTool/MPQTikTool.csproj --configuration Release --no-restore
 
       - name: Publish portable Windows x64 app
-        run: dotnet publish src/MPQTikTool/MPQTikTool.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output publish/win-x64
+        run: dotnet publish src/MPQTikTool/MPQTikTool.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true --output publish/win-x64
 
-      - name: Bundle StormLib native runtime and license
+      - name: Verify output
         shell: pwsh
         run: |
-          Get-ChildItem "$env:STORMLIB_BIN/*.dll" | Copy-Item -Destination "publish/win-x64" -Force
-          $license = Get-ChildItem "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-staticcrt\share" -Recurse -Filter copyright |
-            Where-Object { $_.FullName -match "stormlib" } | Select-Object -First 1
-          if ($license) {
-            Copy-Item $license.FullName "publish/win-x64/StormLib-LICENSE.txt" -Force
-          }
           if (-not (Test-Path "publish/win-x64/MPQTikTool.exe")) {
             throw "Published executable was not found."
-          }
-          if (-not (Test-Path "publish/win-x64/StormLib.dll")) {
-            throw "StormLib.dll is missing from the portable package."
           }
 
       - name: Create portable ZIP
