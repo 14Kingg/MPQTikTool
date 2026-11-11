@@ -185,13 +185,13 @@ public static class MpqRestorer
         sb.AppendLine("## 本次修复");
         sb.AppendLine($"- hash 表 locale 修正：{restore.FixedLocales:N0} 个条目（0xFF000000 → 0），WE 现在可以按名字找到文件");
         sb.AppendLine($"- 移除无效空 WE 文件的哈希条目：{restore.DroppedEditorFiles:N0} 个（避免 WE 读到 1 字节损坏数据而打不开）");
-        sb.AppendLine($"- 写回 `(listfile)`：{restore.NamedBlocks:N0} 个已恢复原名 + 稳定推断名");
+        sb.AppendLine($"- 写回 `(listfile)`：{restore.NamedBlocks:N0} 个已确认原名；匿名块的推断名只写入 name-map.csv，不伪装成真实 MPQ 路径");
         sb.AppendLine($"- 原始文件数据未改动：地形、摆设、阴影、全部贴图/模型保持字节一致");
         sb.AppendLine($"- 导出 WE 关键文件 {editorExported} 个到 `map/`，平台脚本 {scriptExported} 个到 `scripts/`");
         sb.AppendLine();
         sb.AppendLine("## 资源名恢复率（重要：不影响游戏内资源显示）");
         sb.AppendLine($"- 已恢复原名：{restore.NamedBlocks:N0} / {restore.TotalBlocks:N0}（{namedPercent:0.0}%）");
-        sb.AppendLine("- 其余资源使用 `_unnamed/<类型>/B<块号>_<哈希><扩展名>` 稳定推断名，见 `name-map.csv`");
+        sb.AppendLine("- 其余资源使用 `_unnamed/<类型>/B<块号>_<哈希><扩展名>` 稳定导出别名，见 `name-map.csv`；这些别名不是原始路径，不能用于声称已恢复原始文件名");
         sb.AppendLine("- **关键**：MPQ 按「文件名双哈希」查表，hash 表里存的一直是原始路径的哈希，我们只是不知道明文名字。"
             + "因此地图内对贴图/模型的引用在游戏与 WE 中**仍然能命中正确资源**，不会出现绿块。"
             + "名字缺失只影响在导入管理器里人工查看、改名、以及把资源搬到另一张图。");
