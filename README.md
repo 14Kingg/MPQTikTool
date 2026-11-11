@@ -43,8 +43,8 @@ dotnet run --project .\src\MPQTikTool\MPQTikTool.csproj
 
 - 推送到 `main` 或 PR 会执行 Windows x64 编译。
 - 构建任务会安装 x64 StormLib，发布 self-contained 应用并将 StormLib 及依赖 DLL 放入 ZIP。
-- `workflow_dispatch` 可手动运行构建。
-- 推送形如 `v1.0.0` 的 tag 会自动创建 GitHub Release 并上传 `MPQTikTool-win-x64.zip`。
+- `workflow_dispatch` 可手动运行构建并发布预览版。
+- 每次推送到 `main` 且构建成功后，都会自动创建一个 GitHub Preview Release，并上传 `MPQTikTool-win-x64.zip`。
 
 ## 第三方组件
 
