@@ -540,12 +540,51 @@ public sealed class MpqArchive : IDisposable
             MpqHash.DecryptInPlace(copy, key.Value - 1);
             tableBytes = copy;
         }
+        if (tableBytes.Length != tableLength * 4)
+            throw new EndOfStreamException($"块 {entry.BlockIndex} 扇区偏移表被截断：期望 {tableLength * 4} B，实际 {tableBytes.Length} B。");
+
         var offsets = new uint[tableLength];
         for (var i = 0; i < tableLength; i++)
             offsets[i] = BinaryPrimitives.ReadUInt32LittleEndian(tableBytes.AsSpan(i * 4, 4));
         if (offsets[0] < tableLength * 4 || offsets[^1] > entry.CompressedSize)
             throw new InvalidDataException($"块 {entry.BlockIndex} 的扇区表无效。");
+        for (var i = 1; i < tableLength; i++)
+            if (offsets[i] < offsets[i - 1])
+                throw new InvalidDataException($"块 {entry.BlockIndex} 的扇区偏移表不是单调递增。");
 
+        uint[]? sectorCrcs = null;
+        if ((entry.Flags & FlagSectorCrc) != 0)
+        {
+            entry.CrcStatus = "存在，待校验";
+            var expectedTableBytes = checked((uint)((sectorCount + 2) * 4));
+            var crcRegionLength = offsets[sectorCount + 1] - offsets[sectorCount];
+            // StormLib identifies the classic CRC layout by the exact offset-table
+            // size and reads the checksum array from the region after the sectors.
+            if (offsets[0] == expectedTableBytes &&
+                crcRegionLength >= (uint)(sectorCount * 4) &&
+                crcRegionLength <= _sectorSize)
+            {
+                var crcBytes = ReadAt(checked(GetAbsoluteOffset(entry.FilePos) + offsets[sectorCount]),
+                    checked((int)crcRegionLength));
+                if (crcBytes.Length >= sectorCount * 4)
+                {
+                    sectorCrcs = new uint[sectorCount];
+                    for (var i = 0; i < sectorCount; i++)
+                        sectorCrcs[i] = BinaryPrimitives.ReadUInt32LittleEndian(crcBytes.AsSpan(i * 4, 4));
+                }
+            }
+            if (sectorCrcs is null)
+                entry.CrcStatus = "存在，但 CRC 区域格式/长度不受支持";
+        }
+        else
+        {
+            entry.CrcStatus = "未提供";
+        }
+
+        entry.DecryptionStatus = encrypted ? "已解密扇区数据" : "未加密";
+        entry.DecompressionStatus = "处理中";
+        var verified = 0;
+        var crcFailed = false;
         long written = 0;
         for (var sector = 0; sector < sectorCount && written < wanted; sector++)
         {
@@ -556,10 +595,24 @@ public sealed class MpqArchive : IDisposable
                 throw new InvalidDataException($"块 {entry.BlockIndex} 扇区 {sector} 越界。");
             var expected = (int)Math.Min(_sectorSize, entry.Size - (uint)sector * _sectorSize);
             var data = ReadAt(checked(GetAbsoluteOffset(entry.FilePos) + start), checked((int)(end - start)));
+            if (data.Length != (int)(end - start))
+                throw new EndOfStreamException($"块 {entry.BlockIndex} 扇区 {sector} 原始数据被截断。");
             if (encrypted) MpqHash.DecryptInPlace(data, key!.Value + (uint)sector);
             if (data.Length < expected) data = Inflate(data, expected);
             if (data.Length != expected)
                 throw new InvalidDataException($"块 {entry.BlockIndex} 扇区 {sector} 解压长度不匹配：期望 {expected} B，实际 {data.Length} B。");
+
+            if (sectorCrcs is not null)
+            {
+                var actualCrc = MpqHash.ComputeCrc32(data);
+                if (actualCrc != sectorCrcs[sector])
+                {
+                    crcFailed = true;
+                    entry.CrcStatus = $"失败：扇区 {sector}，期望 {sectorCrcs[sector]:X8}，实际 {actualCrc:X8}";
+                }
+                else verified++;
+            }
+
             var need = (int)Math.Min(expected, wanted - written);
             if (need > 0)
             {
@@ -568,6 +621,11 @@ public sealed class MpqArchive : IDisposable
                 progress?.Report(written);
             }
         }
+
+        entry.DecompressionStatus = "成功";
+        if (sectorCrcs is not null && !crcFailed)
+            entry.CrcStatus = verified == sectorCount ? $"通过（{verified}/{sectorCount}）" : $"部分校验（{verified}/{sectorCount}）";
+
     }
 
     private static void WriteChunk(byte[] data, Stream destination, uint wanted,
