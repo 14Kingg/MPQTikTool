@@ -15,7 +15,7 @@ public static class MdxInspector
         ["ATCH"] = "附着点", ["PIVT"] = "枢轴点", ["PREM"] = "粒子发射器",
         ["PRE2"] = "粒子发射器2", ["RIBB"] = "飘带发射器", ["EVTS"] = "事件对象",
         ["CAMS"] = "摄像机", ["CLID"] = "碰撞形状", ["BPOS"] = "绑定姿势",
-        ["FAFX"] = "面部特效", ["皮肤"] = "皮肤数据"
+        ["FAFX"] = "面部特效"
     };
 
     public static string Describe(byte[] data)
