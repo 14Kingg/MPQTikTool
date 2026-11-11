@@ -34,7 +34,7 @@ public sealed class MpqArchiveService : IDisposable
             do
             {
                 var name = data.FileName?.TrimEnd('\0') ?? string.Empty;
-                if (!string.IsNullOrWhiteSpace(name) && name != "(listfile)")
+                if (!string.IsNullOrWhiteSpace(name))
                     entries.Add(new ArchiveEntry(name, data.FileSize, data.FileFlags, data.CompressedSize, data.Locale));
             }
             while (NativeMethods.SFileFindNextFile(findHandle, out data));
