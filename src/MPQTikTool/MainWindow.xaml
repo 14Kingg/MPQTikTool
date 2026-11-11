@@ -48,7 +48,7 @@
         <StatusBar DockPanel.Dock="Bottom" Background="#FF20242C" Foreground="#FFB9C2D0">
             <StatusBarItem><TextBlock x:Name="StatusText" Text="就绪"/></StatusBarItem>
         </StatusBar>
-        <Grid Margin="12">
+        <TabControl Margin="12" Background="#FF171A20" BorderBrush="#FF343B48"><TabItem Header="资源浏览"><Grid Margin="0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2.2*"/>
                 <ColumnDefinition Width="3*"/>
@@ -105,6 +105,71 @@
                     </Grid>
                 </DockPanel>
             </Border>
-        </Grid>
+
+        </Grid></TabItem>
+        <TabItem Header="MPQ 结构"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
+            <TextBlock Text="MPQ 容器结构检查" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
+            <TextBlock Text="当前传统 Hash/Block Table 解析已有基础；v4 HET/BET、完整压缩掩码、CRC 全量验证、64 位偏移和大文件重建尚未完成。后续此页展示真实 Header、表项、块布局、扇区表及校验状态。" TextWrapping="Wrap" Foreground="#FFB9C2D0"/>
+            <GroupBox Header="底层能力验收" Margin="0,16,0,0" Padding="12">
+                <StackPanel>
+                    <TextBlock Text="MPQ v1 / v2 / v3 / v4 与 HET/BET"/>
+                    <TextBlock Text="Hash Table / Block Table / 扩展表"/>
+                    <TextBlock Text="扇区偏移表、加密、压缩掩码、CRC"/>
+                    <TextBlock Text="32/64 位偏移、大文件、匿名 Block 原始数据"/>
+                    <TextBlock Text="状态：按路线图逐项实现并由测试验证" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel>
+            </GroupBox>
+        </StackPanel></ScrollViewer></TabItem>
+        <TabItem Header="地图结构"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
+            <TextBlock Text="地图结构解析" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
+            <UniformGrid Columns="2">
+                <GroupBox Header="地图与场景数据" Margin="4" Padding="10"><StackPanel>
+                    <TextBlock Text="W3I · 地图信息"/><TextBlock Text="W3E · 地形"/><TextBlock Text="WPM · 寻路图"/><TextBlock Text="DOO · 装饰物"/><TextBlock Text="SHD · 阴影图"/>
+                    <TextBlock Text="状态：解析器接入待实现" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel></GroupBox>
+                <GroupBox Header="物编与触发器" Margin="4" Padding="10"><StackPanel>
+                    <TextBlock Text="W3U / W3T / W3A / W3B / W3D / W3Q"/>
+                    <TextBlock Text="WTG / WCT / WTS"/>
+                    <TextBlock Text="对象 ID、字段修改、函数、变量和字符串引用"/>
+                    <TextBlock Text="状态：结构化解析待实现" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel></GroupBox>
+            </UniformGrid>
+            <GroupBox Header="资源依赖关系" Margin="4,12,4,4" Padding="10">
+                <TextBlock Text="计划展示模型到纹理、物编到对象、触发器到函数/变量/字符串，以及场景到资源文件的引用关系。缺失引用将保留为问题项。" TextWrapping="Wrap"/>
+            </GroupBox>
+        </StackPanel></ScrollViewer></TabItem>
+        <TabItem Header="工程重建"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
+            <TextBlock Text="地图工程重建与校验" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
+            <TextBlock Text="目标输出：可编辑地图目录、独立资源工程、结构化地图模型、原始脚本与完整恢复报告。" TextWrapping="Wrap" Foreground="#FFB9C2D0"/>
+            <GroupBox Header="重建流水线" Margin="0,16,0,0" Padding="12"><StackPanel>
+                <TextBlock Text="1. 名称证据确认 → 2. 资源解密/解压 → 3. 目录与依赖重建 → 4. Hash/Block Table 重建 → 5. 重新打包 → 6. SHA-256 逐项比对"/>
+                <TextBlock Text="当前已有基础导出和有限地图修复；完整工程重建、扩展表重建及逐项重打包校验尚未完成。" Foreground="#FFFFC66D" Margin="0,10,0,0" TextWrapping="Wrap"/>
+            </StackPanel></GroupBox>
+            <GroupBox Header="完整性报告" Margin="0,12,0,0" Padding="12">
+                <TextBlock Text="分别统计原名确认、名称推断、匿名块、密文保留、解压失败、CRC 失败、未知格式、解析失败、缺失引用、不可逆/受保护数据，以及每个输出文件的 SHA-256。" TextWrapping="Wrap"/>
+            </GroupBox>
+        </StackPanel></ScrollViewer></TabItem>
+        <TabItem Header="逆向分析"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
+            <TextBlock Text="脚本与私有容器分析" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
+            <UniformGrid Columns="2">
+                <GroupBox Header="JASS 分析" Margin="4" Padding="10"><StackPanel>
+                    <TextBlock Text="源码识别 / 词法语法分析"/><TextBlock Text="函数、全局变量、调用关系"/><TextBlock Text="反编译结果与原始字节并存"/>
+                    <TextBlock Text="状态：待实现" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel></GroupBox>
+                <GroupBox Header="Lua 分析" Margin="4" Padding="10"><StackPanel>
+                    <TextBlock Text="源码与字节码版本检测"/><TextBlock Text="指令反汇编 / 常量与字符串提取"/><TextBlock Text="匹配 VM 版本后尝试反编译"/>
+                    <TextBlock Text="状态：待实现" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel></GroupBox>
+                <GroupBox Header="平台插件与自定义容器" Margin="4" Padding="10"><StackPanel>
+                    <TextBlock Text="魔数、长度、版本、嵌套结构探测"/><TextBlock Text="熵与重复块特征分析"/><TextBlock Text="已知算法 / 疑似变换 / 未知数据分类"/>
+                    <TextBlock Text="状态：待实现" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel></GroupBox>
+                <GroupBox Header="证据与结论" Margin="4" Padding="10"><StackPanel>
+                    <TextBlock Text="保留原始字节与 SHA-256"/><TextBlock Text="记录分析假设、置信度和复现步骤"/><TextBlock Text="不可解密内容不伪造源码"/>
+                    <TextBlock Text="状态：待实现" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
+                </StackPanel></GroupBox>
+            </UniformGrid>
+        </StackPanel></ScrollViewer></TabItem>
+        </TabControl>
     </DockPanel>
 </Window>
