@@ -81,7 +81,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: preview-${{ github.run_number }}
-          name: MPQ Tik Tool Preview #${{ github.run_number }}
+          name: "MPQ Tik Tool Preview #${{ github.run_number }}"
           prerelease: true
           make_latest: true
           files: MPQTikTool-win-x64.zip
