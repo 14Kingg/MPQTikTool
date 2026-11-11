@@ -91,27 +91,29 @@ public static class BlpDecoder
             else if (alphaEncoding is not 0) throw new NotSupportedException($"暂不支持 DXT alphaEncoding={alphaEncoding}。");
 
             var colorOffset = cursor + (alphaEncoding == 0 ? 0 : 8);
-            DecodeColors(src.Slice(colorOffset, 8), alphaEncoding == 0, out var colors, out var indices);
+            DecodeColors(src.Slice(colorOffset, 8), alphaEncoding == 0, out var colors, out var indices, out var transparentMode);
             for (var py = 0; py < 4; py++)
             for (var px = 0; px < 4; px++)
             {
                 var x = bx * 4 + px; var y = by * 4 + py;
                 if (x >= w || y >= h) continue;
                 var p = py * 4 + px; var di = (y * w + x) * 4;
-                var c = colors[(indices >> (p * 2)) & 3];
+                var colorIndex = (int)((indices >> (p * 2)) & 3);
+                var c = colors[colorIndex];
                 dst[di] = c.B; dst[di + 1] = c.G; dst[di + 2] = c.R;
-                dst[di + 3] = alpha[p];
+                dst[di + 3] = transparentMode && colorIndex == 3 ? (byte)0 : alpha[p];
             }
             cursor += blockBytes;
         }
     }
 
-    private static void DecodeColors(ReadOnlySpan<byte> block, bool dxt1, out (byte R, byte G, byte B)[] colors, out uint indices)
+    private static void DecodeColors(ReadOnlySpan<byte> block, bool dxt1, out (byte R, byte G, byte B)[] colors, out uint indices, out bool transparentMode)
     {
         var c0 = BinaryPrimitives.ReadUInt16LittleEndian(block);
         var c1 = BinaryPrimitives.ReadUInt16LittleEndian(block[2..]);
         colors = new (byte, byte, byte)[4];
         colors[0] = Rgb565(c0); colors[1] = Rgb565(c1);
+        transparentMode = dxt1 && c0 <= c1;
         if (c0 > c1 || !dxt1)
         {
             colors[2] = Mix(colors[0], colors[1], 2, 1, 3);
