@@ -230,14 +230,27 @@ public sealed class MpqArchive : IDisposable
 
     private static byte[] ReadAt(FileStream stream, long offset, int count)
     {
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset));
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count));
+        if (count == 0) return Array.Empty<byte>();
+
         var buffer = new byte[count];
-        int read;
+        var totalRead = 0;
         lock (stream)
         {
+            if (offset >= stream.Length) return Array.Empty<byte>();
             stream.Position = offset;
-            read = stream.Read(buffer, 0, count);
+            while (totalRead < count)
+            {
+                var read = stream.Read(buffer, totalRead, count - totalRead);
+                if (read == 0) break;
+                totalRead += read;
+            }
         }
-        if (read != count) Array.Resize(ref buffer, Math.Max(read, 0));
+
+        // Preserve the actual byte count on a truncated archive. Callers can then
+        // reject incomplete tables/blocks instead of consuming zero-filled tails.
+        if (totalRead != buffer.Length) Array.Resize(ref buffer, totalRead);
         return buffer;
     }
 
