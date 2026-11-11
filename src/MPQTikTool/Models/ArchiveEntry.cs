@@ -22,9 +22,9 @@ public sealed record ArchiveEntry(
         ".blp" or ".tga" or ".bmp" or ".png" or ".jpg" or ".jpeg" or ".dds" or ".gif" => "图片",
         ".mdx" or ".mdl" => "模型",
         ".wav" or ".mp3" or ".ogg" => "音频",
-        ".lua" or ".j" or ".ai" or ".fdf" or ".txt" or ".ini" or ".slk" or ".toc" or ".xml" => "文本/脚本",
+        ".lua" or ".j" or ".jass" or ".ai" or ".fdf" or ".txt" or ".ini" or ".slk" or ".toc" or ".xml" or ".json" or ".md" => "文本/脚本",
         ".w3u" or ".w3t" or ".w3a" or ".w3h" or ".w3q" or ".w3d" or ".w3b" => "物编数据",
-        ".w3i" or ".w3e" or ".w3r" or ".w3c" or ".w3s" or ".w3o" or ".wpm" or ".doo" or ".wct" or ".wtg" or ".wts" => "地图数据",
+        ".w3i" or ".w3e" or ".w3r" or ".w3c" or ".w3s" or ".w3o" or ".wpm" or ".doo" or ".wct" or ".wtg" or ".wts" or ".imp" => "地图数据",
         _ => "其他"
     };
 }
