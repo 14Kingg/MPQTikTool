@@ -27,12 +27,12 @@ jobs:
         shell: pwsh
         run: |
           vcpkg install stormlib:x64-windows
-          $storm = Get-ChildItem "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows" -Recurse -Filter StormLib.dll |
-            Select-Object -First 1
+          $bin = "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin"
+          $storm = Get-ChildItem $bin -Filter StormLib.dll | Select-Object -First 1
           if (-not $storm) {
             throw "StormLib.dll was not produced by the vcpkg StormLib package."
           }
-          "STORMLIB_PATH=$($storm.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "STORMLIB_BIN=$bin" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Restore
         run: dotnet restore src/MPQTikTool/MPQTikTool.csproj
@@ -46,7 +46,7 @@ jobs:
       - name: Bundle StormLib native runtime
         shell: pwsh
         run: |
-          Copy-Item "$env:STORMLIB_PATH" "publish/win-x64/StormLib.dll" -Force
+          Get-ChildItem "$env:STORMLIB_BIN/*.dll" | Copy-Item -Destination "publish/win-x64" -Force
           if (-not (Test-Path "publish/win-x64/MPQTikTool.exe")) {
             throw "Published executable was not found."
           }
