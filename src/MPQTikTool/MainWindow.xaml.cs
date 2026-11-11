@@ -130,7 +130,7 @@ public partial class MainWindow : Window
         if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
             return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
         try { return new UTF8Encoding(false, true).GetString(bytes); }
-        catch { return Encoding.GetEncoding(936).GetString(bytes); }
+        catch { return Encoding.Latin1.GetString(bytes); }
     }
 
     private void ClearPreview()
@@ -170,14 +170,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        var dialog = new OpenFolderDialog
         {
-            Description = "选择完整导出目录",
-            UseDescriptionForTitle = true
+            Title = "选择完整导出目录",
+            Multiselect = false
         };
-        if (dialog.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
+        if (dialog.ShowDialog(this) != true) return;
 
-        var root = Path.GetFullPath(dialog.SelectedPath);
+        var root = Path.GetFullPath(dialog.FolderName);
         var succeeded = 0;
         var failed = new List<string>();
         foreach (var entry in _allEntries)
