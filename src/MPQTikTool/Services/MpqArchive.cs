@@ -572,7 +572,7 @@ public sealed class MpqArchive : IDisposable
             {
                 var crcBytes = ReadAt(checked(GetAbsoluteOffset(entry.FilePos) + offsets[sectorCount]),
                     checked((int)crcRegionLength));
-                if (crcBytes.Length >= sectorCount * 4)
+                if (crcBytes.Length == sectorCount * 4)
                 {
                     sectorCrcs = new uint[sectorCount];
                     for (var i = 0; i < sectorCount; i++)
