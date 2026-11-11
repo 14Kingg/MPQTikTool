@@ -81,10 +81,10 @@ public static class BlpDecoder
         var blocksY = (h + 3) / 4;
         if (src.Length < blocksX * blocksY * blockBytes) throw new InvalidDataException("BLP2 DXT mipmap 数据不完整。");
         var cursor = 0;
+        Span<byte> alpha = stackalloc byte[16];
         for (var by = 0; by < blocksY; by++)
         for (var bx = 0; bx < blocksX; bx++)
         {
-            Span<byte> alpha = stackalloc byte[16];
             alpha.Fill(255);
             if (alphaEncoding == 1) DecodeDxt3Alpha(src.Slice(cursor, 8), alpha);
             else if (alphaEncoding == 7) DecodeDxt5Alpha(src.Slice(cursor, 8), alpha);
