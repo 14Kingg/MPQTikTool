@@ -131,6 +131,19 @@ internal static class MpqHash
     /// The first DWORD of the encrypted sector-offset table is always the table size,
     /// which gives enough known plaintext to solve the 32-bit key in 256 tries.
     /// </summary>
+    /// <summary>Standard reflected CRC-32 (polynomial 0xEDB88320), as used by MPQ sector checksums.</summary>
+    public static uint ComputeCrc32(ReadOnlySpan<byte> data)
+    {
+        uint crc = 0xFFFFFFFF;
+        foreach (var value in data)
+        {
+            crc ^= value;
+            for (var bit = 0; bit < 8; bit++)
+                crc = (crc & 1) != 0 ? (crc >> 1) ^ 0xEDB88320u : crc >> 1;
+        }
+        return ~crc;
+    }
+
     public static uint? RecoverFileKey(uint firstCipherDword, uint plainFirstDword, Func<uint, bool> validateTableKey)
     {
         unchecked
