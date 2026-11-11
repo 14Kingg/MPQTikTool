@@ -3,7 +3,6 @@ name: Windows build and release
 on:
   push:
     branches: [ main ]
-    tags: [ "v*" ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -43,12 +42,20 @@ jobs:
       - name: Publish portable Windows x64 app
         run: dotnet publish src/MPQTikTool/MPQTikTool.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output publish/win-x64
 
-      - name: Bundle StormLib native runtime
+      - name: Bundle StormLib native runtime and license
         shell: pwsh
         run: |
           Get-ChildItem "$env:STORMLIB_BIN/*.dll" | Copy-Item -Destination "publish/win-x64" -Force
+          $license = Get-ChildItem "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\share" -Recurse -Filter copyright |
+            Where-Object { $_.FullName -match "stormlib" } | Select-Object -First 1
+          if ($license) {
+            Copy-Item $license.FullName "publish/win-x64/StormLib-LICENSE.txt" -Force
+          }
           if (-not (Test-Path "publish/win-x64/MPQTikTool.exe")) {
             throw "Published executable was not found."
+          }
+          if (-not (Test-Path "publish/win-x64/StormLib.dll")) {
+            throw "StormLib.dll is missing from the portable package."
           }
 
       - name: Create portable ZIP
@@ -65,9 +72,13 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish preview release
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: preview-${{ github.run_number }}
+          name: MPQ Tik Tool Preview #${{ github.run_number }}
+          prerelease: true
+          make_latest: true
           files: MPQTikTool-win-x64.zip
           generate_release_notes: true
