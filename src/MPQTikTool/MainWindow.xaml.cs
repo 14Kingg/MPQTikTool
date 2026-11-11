@@ -179,6 +179,7 @@ public partial class MainWindow : Window
         if (dialog.ShowDialog(this) != true) return;
 
         var root = Path.GetFullPath(dialog.FolderName);
+        var rootPrefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
         var succeeded = 0;
         var failed = new List<string>();
         foreach (var entry in _allEntries)
@@ -187,7 +188,7 @@ public partial class MainWindow : Window
             {
                 var relative = entry.Name.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
                 var destination = Path.GetFullPath(Path.Combine(root, relative));
-                if (!destination.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                if (!destination.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     failed.Add(entry.Name + " (非法路径)");
                     continue;
