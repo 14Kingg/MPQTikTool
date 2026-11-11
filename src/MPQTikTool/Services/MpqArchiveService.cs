@@ -24,6 +24,25 @@ public sealed class MpqArchiveService : IDisposable
             throw new InvalidOperationException($"StormLib 无法打开该地图（Win32 错误：{Marshal.GetLastWin32Error()}）。请确认文件是有效的 MPQ/W3X/W3M，且 StormLib.dll 可用。");
 
         ArchivePath = path;
+        return EnumerateNamedFiles();
+    }
+
+    /// <summary>
+    /// Adds an external MPQ listfile to StormLib's name database. Only names whose
+    /// hashes match entries already present in the archive can be recovered.
+    /// </summary>
+    public void AddExternalListFile(string listFilePath)
+    {
+        EnsureOpen();
+        if (!File.Exists(listFilePath)) throw new FileNotFoundException("外部文件名库不存在。", listFilePath);
+        var result = NativeMethods.SFileAddListFile(_archive, listFilePath);
+        if (result != 0)
+            throw new IOException($"加载外部文件名库失败（StormLib 错误码：{result}）。");
+    }
+
+    public IReadOnlyList<ArchiveEntry> EnumerateNamedFiles()
+    {
+        EnsureOpen();
         var entries = new List<ArchiveEntry>();
         var findHandle = NativeMethods.SFileFindFirstFile(_archive, "*", out var data, IntPtr.Zero);
         if (findHandle == IntPtr.Zero || findHandle == new IntPtr(-1))
@@ -33,7 +52,7 @@ public sealed class MpqArchiveService : IDisposable
         {
             do
             {
-                var name = data.FileName?.TrimEnd('\0') ?? string.Empty;
+                var name = data.FileName?.TrimEnd('\\0') ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(name))
                     entries.Add(new ArchiveEntry(name, data.FileSize, data.FileFlags, data.CompressedSize, data.Locale));
             }
@@ -49,30 +68,6 @@ public sealed class MpqArchiveService : IDisposable
             .Select(x => x.First())
             .OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
-    }
-
-    public void Extract(ArchiveEntry entry, string destinationPath)
-    {
-        EnsureOpen();
-        var directory = Path.GetDirectoryName(destinationPath);
-        if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-
-        if (!NativeMethods.SFileExtractFile(_archive, entry.Name, destinationPath, 0))
-            throw new IOException($"导出失败：{entry.Name}（Win32 错误：{Marshal.GetLastWin32Error()}）。文件可能加密、损坏或缺少解密密钥。");
-    }
-
-    public byte[] ReadAllBytes(ArchiveEntry entry)
-    {
-        var temp = Path.Combine(Path.GetTempPath(), "MPQTikTool", Guid.NewGuid().ToString("N") + entry.Extension);
-        try
-        {
-            Extract(entry, temp);
-            return File.ReadAllBytes(temp);
-        }
-        finally
-        {
-            try { if (File.Exists(temp)) File.Delete(temp); } catch { /* best effort */ }
-        }
     }
 
     private void EnsureOpen()
@@ -118,6 +113,9 @@ public sealed class MpqArchiveService : IDisposable
         [DllImport(Dll, SetLastError = true, EntryPoint = "SFileCloseArchive")]
         [return: MarshalAs(UnmanagedType.Bool)]
         internal static extern bool SFileCloseArchive(IntPtr archive);
+
+        [DllImport(Dll, CharSet = CharSet.Ansi, SetLastError = true, EntryPoint = "SFileAddListFile")]
+        internal static extern uint SFileAddListFile(IntPtr archive, string listFileName);
 
         [DllImport(Dll, CharSet = CharSet.Ansi, SetLastError = true, EntryPoint = "SFileFindFirstFile")]
         internal static extern IntPtr SFileFindFirstFile(IntPtr archive, string mask, out SFileFindData findData, IntPtr listFile);
