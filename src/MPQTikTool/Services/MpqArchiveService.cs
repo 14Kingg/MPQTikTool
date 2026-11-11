@@ -95,7 +95,7 @@ public sealed class MpqArchiveService : IDisposable
     internal struct SFileFindData
     {
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string FileName;
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string PlainName;
+        public IntPtr PlainName;
         public uint HashIndex;
         public uint BlockIndex;
         public uint FileSize;
