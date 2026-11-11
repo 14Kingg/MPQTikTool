@@ -95,6 +95,14 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (entry.Extension == ".blp")
+            {
+                var bytes = _archive.ReadAllBytes(entry);
+                ImagePreview.Source = BlpDecoder.Decode(bytes);
+                ImageScroll.Visibility = Visibility.Visible;
+                return;
+            }
+
             if (new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif", ".tif", ".tiff" }.Contains(entry.Extension))
             {
                 var bytes = _archive.ReadAllBytes(entry);
@@ -110,9 +118,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            FallbackPreview.Text = entry.Extension == ".blp"
-                ? "BLP 纹理：已识别，专用解码器正在规划中。当前可先导出原始文件。"
-                : entry.Extension is ".mdx" or ".mdl"
+            FallbackPreview.Text = entry.Extension is ".mdx" or ".mdl"
                     ? "Warcraft III 模型：已识别，3D 模型查看器将在后续版本接入。"
                     : "该格式暂不支持内嵌预览。可以使用“导出选中”保存原始资源。";
             FallbackPreview.Visibility = Visibility.Visible;
