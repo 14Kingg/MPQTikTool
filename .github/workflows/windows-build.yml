@@ -1,20 +1,73 @@
-name: Windows build
+name: Windows build and release
+
 on:
   push:
     branches: [ main ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Install StormLib (x64)
+        shell: pwsh
+        run: |
+          vcpkg install stormlib:x64-windows
+          $storm = Get-ChildItem "$env:VCPKG_INSTALLATION_ROOT\installed\x64-windows" -Recurse -Filter StormLib.dll |
+            Select-Object -First 1
+          if (-not $storm) {
+            throw "StormLib.dll was not produced by the vcpkg StormLib package."
+          }
+          "STORMLIB_PATH=$($storm.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Restore
         run: dotnet restore src/MPQTikTool/MPQTikTool.csproj
+
       - name: Build
         run: dotnet build src/MPQTikTool/MPQTikTool.csproj --configuration Release --no-restore
+
+      - name: Publish portable Windows x64 app
+        run: dotnet publish src/MPQTikTool/MPQTikTool.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output publish/win-x64
+
+      - name: Bundle StormLib native runtime
+        shell: pwsh
+        run: |
+          Copy-Item "$env:STORMLIB_PATH" "publish/win-x64/StormLib.dll" -Force
+          if (-not (Test-Path "publish/win-x64/MPQTikTool.exe")) {
+            throw "Published executable was not found."
+          }
+
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "publish/win-x64/*" -DestinationPath "MPQTikTool-win-x64.zip" -Force
+
+      - name: Upload build package
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: MPQTikTool-win-x64
+          path: MPQTikTool-win-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MPQTikTool-win-x64.zip
+          generate_release_notes: true
