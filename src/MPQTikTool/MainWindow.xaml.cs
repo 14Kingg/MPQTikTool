@@ -126,14 +126,40 @@ public partial class MainWindow : Window
                 return;
             }
 
-            FallbackPreview.Text = "该格式暂不支持内嵌预览。可以使用“导出选中”保存原始资源。";
-            FallbackPreview.Visibility = Visibility.Visible;
+            var raw = _archive.ReadAllBytes(entry);
+            TextPreview.Text = BuildHexPreview(raw);
+            TextPreview.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
         {
             FallbackPreview.Text = $"预览失败：{ex.Message}";
             FallbackPreview.Visibility = Visibility.Visible;
         }
+    }
+
+    private static string BuildHexPreview(byte[] bytes)
+    {
+        const int maxBytes = 4096;
+        var length = Math.Min(bytes.Length, maxBytes);
+        var sb = new StringBuilder();
+        sb.AppendLine($"二进制资源预览（前 {length:N0} / {bytes.Length:N0} bytes）");
+        sb.AppendLine("偏移       00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  | ASCII");
+        for (var offset = 0; offset < length; offset += 16)
+        {
+            var count = Math.Min(16, length - offset);
+            sb.Append(offset.ToString("X8")).Append("   ");
+            for (var i = 0; i < 16; i++)
+                sb.Append(i < count ? bytes[offset + i].ToString("X2") : "  ").Append(' ');
+            sb.Append("| ");
+            for (var i = 0; i < count; i++)
+            {
+                var b = bytes[offset + i];
+                sb.Append(b is >= 32 and <= 126 ? (char)b : '.');
+            }
+            sb.AppendLine();
+        }
+        if (bytes.Length > maxBytes) sb.AppendLine("\\n... 已截断，导出选中可保存完整原始文件。");
+        return sb.ToString();
     }
 
     private static string DecodeText(byte[] bytes)
@@ -193,7 +219,12 @@ public partial class MainWindow : Window
         var root = Path.GetFullPath(dialog.FolderName);
         var rootPrefix = Path.EndsInDirectorySeparator(root) ? root : root + Path.DirectorySeparatorChar;
         var succeeded = 0;
+        long exportedBytes = 0;
         var failed = new List<string>();
+        var manifest = new List<string>
+        {
+            "Status,ArchivePath,Size,CompressedSize,Locale,Flags,Message"
+        };
         foreach (var entry in _allEntries)
         {
             try
@@ -207,17 +238,37 @@ public partial class MainWindow : Window
                 }
                 _archive.Extract(entry, destination);
                 succeeded++;
+                exportedBytes += entry.Size;
+                manifest.Add(Csv("OK", relative, entry.Size.ToString(), entry.CompressedSize.ToString(),
+                    entry.Locale.ToString(), $"0x{entry.Flags:X8}", ""));
             }
-            catch (Exception ex) { failed.Add(entry.Name + " (" + ex.Message + ")"); }
+            catch (Exception ex)
+            {
+                failed.Add(entry.Name + " (" + ex.Message + ")");
+                manifest.Add(Csv("FAILED", entry.Name, entry.Size.ToString(), entry.CompressedSize.ToString(),
+                    entry.Locale.ToString(), $"0x{entry.Flags:X8}", ex.Message));
+            }
         }
 
-        StatusText.Text = $"导出完成：成功 {succeeded}，失败 {failed.Count}";
+        try
+        {
+            File.WriteAllLines(Path.Combine(root, "_MPQTikTool_ExportManifest.csv"), manifest, new UTF8Encoding(true));
+            File.WriteAllText(Path.Combine(root, "_MPQTikTool_ExportErrors.txt"),
+                failed.Count == 0 ? "全部已知文件均导出成功。" : string.Join(Environment.NewLine, failed),
+                new UTF8Encoding(true));
+        }
+        catch (Exception ex) { failed.Add("写入导出报告失败：" + ex.Message); }
+
+        StatusText.Text = $"导出完成：成功 {succeeded}，失败 {failed.Count}，{exportedBytes:N0} bytes";
         if (failed.Count > 0)
-            MessageBox.Show($"成功：{succeeded}\n失败：{failed.Count}\n\n" + string.Join("\n", failed.Take(20)),
+            MessageBox.Show($"成功：{succeeded}\n失败：{failed.Count}\n已导出：{exportedBytes:N0} bytes\n\n完整清单和失败原因已写入导出目录。\n\n" + string.Join("\n", failed.Take(12)),
                 "批量导出结果", MessageBoxButton.OK, MessageBoxImage.Warning);
         else
-            MessageBox.Show($"已导出 {succeeded} 个文件。", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"已导出 {succeeded} 个文件（{exportedBytes:N0} bytes）。\n导出目录已附带 CSV 清单和结果报告。", "导出完成", MessageBoxButton.OK, MessageBoxImage.Information);
     }
+
+    private static string Csv(params string[] fields) =>
+        string.Join(",", fields.Select(value => "\"" + value.Replace("\"", "\"\"") + "\""));
 
     protected override void OnClosed(EventArgs e)
     {
