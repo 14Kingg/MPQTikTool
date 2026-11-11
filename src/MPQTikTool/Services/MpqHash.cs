@@ -77,9 +77,19 @@ internal static class MpqHash
     /// <summary>Decrypts a whole number of DWORDs in place (MPQ block cipher).</summary>
     public static void DecryptInPlace(Span<byte> data, uint key)
     {
+        var seed1 = key;
+        var seed2 = 0xEEEEEEEEu;
+        DecryptInPlace(data, ref seed1, ref seed2);
+    }
+
+    /// <summary>
+    /// Stateful variant for streaming encrypted raw files. Call successive chunks in order;
+    /// every chunk except the final one must have a length divisible by four.
+    /// </summary>
+    public static void DecryptInPlace(Span<byte> data, ref uint seed1, ref uint seed2)
+    {
         unchecked
         {
-            uint seed1 = key, seed2 = 0xEEEEEEEE;
             var dwords = data.Length / 4;
             for (var i = 0; i < dwords; i++)
             {
