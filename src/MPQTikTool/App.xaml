@@ -1,0 +1,11 @@
+<Application x:Class="MPQTikTool.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+    <Application.Resources>
+        <SolidColorBrush x:Key="AccentBrush" Color="#FF4C8DFF"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#FF20242C"/>
+        <SolidColorBrush x:Key="WindowBrush" Color="#FF171A20"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#FFE8ECF2"/>
+    </Application.Resources>
+</Application>
