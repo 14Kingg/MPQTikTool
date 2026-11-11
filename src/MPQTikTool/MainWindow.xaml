@@ -64,7 +64,10 @@
                     <DataGridTextColumn Header="类型" Binding="{Binding Category}" Width="95"/>
                     <DataGridTextColumn Header="格式" Binding="{Binding KindName}" Width="95"/>
                     <DataGridTextColumn Header="大小" Binding="{Binding DisplaySize}" Width="85"/>
-                    <DataGridTextColumn Header="块" Binding="{Binding BlockIndex}" Width="70"/>
+                    <DataGridTextColumn Header="解密" Binding="{Binding DecryptionStatus}" Width="110"/>
+                    <DataGridTextColumn Header="解压" Binding="{Binding DecompressionStatus}" Width="90"/>
+                    <DataGridTextColumn Header="CRC" Binding="{Binding CrcStatus}" Width="150"/>
+                    <DataGridTextColumn Header="块" Binding="{Binding BlockIndex}" Width="55"/>
                 </DataGrid.Columns>
             </DataGrid>
             <Border Grid.Column="1" Margin="10,0,0,0" Background="#FF20242C" BorderBrush="#FF343B48" BorderThickness="1" Padding="12">
