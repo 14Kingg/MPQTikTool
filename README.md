@@ -24,14 +24,14 @@ Release 包为 .NET 8 self-contained x64 发布包，已随包携带 StormLib �
 ## 当前限制
 
 - BLP1/JPEG BLP 变体尚未解码。
-- MDX 目前仍未提供真正的 3D 模型渲染、骨骼动画和材质预览；可导出原始模型文件。
+- MDX 可查看外层 Chunk 结构，但尚未提供真正的 3D 模型渲染、骨骼动画和材质预览；可导出原始模型文件。
 - 音频播放、物编数据结构化编辑、资源依赖图、地图内部加密资源的专用处理尚未完成。
 - 地图缺少 `(listfile)` 时，StormLib 能否给出可识别文件名取决于 MPQ 内部表和伪文件名能力；不能保证恢复原始文件名。未知资源仍应通过批量导出保留。
 - 加密且需要特定文件名作为解密密钥的资源，若无法推导文件名，可能无法正确提取。
 
 ## 本地构建
 
-需要 Windows 10/11 x64、.NET 8 SDK、Visual Studio C++ Build Tools（仅构建 StormLib 原生依赖时需要）。
+需要 Windows 10/11 x64、.NET 8 SDK、Visual Studio C++ Build Tools（仅本地构建 StormLib 原生依赖时需要）。
 
 ```powershell
 dotnet restore .\src\MPQTikTool\MPQTikTool.csproj
