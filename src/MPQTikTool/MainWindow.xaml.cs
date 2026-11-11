@@ -284,6 +284,8 @@ public partial class MainWindow : Window
                 if (!destination.StartsWith(rootPrefix, StringComparison.OrdinalIgnoreCase))
                 {
                     failed.Add(entry.Name + " (非法路径)");
+                    manifest.Add(Csv("REJECTED", entry.Name, entry.Size.ToString(), entry.CompressedSize.ToString(),
+                        entry.Locale.ToString(), $"0x{entry.Flags:X8}", "拒绝写出：路径越界"));
                     continue;
                 }
                 _archive.Extract(entry, destination);
