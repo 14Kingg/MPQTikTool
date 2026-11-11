@@ -4,7 +4,7 @@ public sealed record ArchiveEntry(
     string Name,
     uint Size,
     uint Flags,
-    uint Compression,
+    uint CompressedSize,
     uint Locale)
 {
     public string Extension => Path.GetExtension(Name).ToLowerInvariant();
