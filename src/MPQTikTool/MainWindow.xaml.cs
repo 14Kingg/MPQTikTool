@@ -153,7 +153,8 @@ public partial class MainWindow : Window
         PreviewName.Text = entry.Name;
         PreviewInfo.Text = $"{entry.Category} · {entry.KindName} · {entry.DisplaySize} · 块 {entry.BlockIndex} · " +
                           $"Flags {entry.FlagsText} · Locale 0x{entry.Locale:X8} · Hash {entry.Hash1:X8}/{entry.Hash2:X8}" +
-                          (entry.IsEncrypted ? " · 加密" : string.Empty);
+                          (entry.IsEncrypted ? " · 加密" : string.Empty) +
+                          $"\n解密：{entry.DecryptionStatus} · 解压：{entry.DecompressionStatus} · CRC：{entry.CrcStatus}";
 
         var cap = PreviewCap(entry.Kind);
         byte[] bytes;
