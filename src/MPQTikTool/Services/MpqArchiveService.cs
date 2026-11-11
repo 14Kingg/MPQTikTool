@@ -34,7 +34,7 @@ public sealed class MpqArchiveService : IDisposable
             {
                 var name = data.FileName?.TrimEnd('\0') ?? string.Empty;
                 if (!string.IsNullOrWhiteSpace(name) && name != "(listfile)")
-                    entries.Add(new ArchiveEntry(name, data.FileSize, data.FileFlags, data.Compression, data.Locale));
+                    entries.Add(new ArchiveEntry(name, data.FileSize, data.FileFlags, data.CompressedSize, data.Locale));
             }
             while (NativeMethods.SFileFindNextFile(findHandle, out data));
         }
@@ -100,7 +100,7 @@ public sealed class MpqArchiveService : IDisposable
         public uint BlockIndex;
         public uint FileSize;
         public uint FileFlags;
-        public uint Compression;
+        public uint CompressedSize;
         public uint FileTimeLow;
         public uint FileTimeHigh;
         public uint Locale;
