@@ -57,7 +57,7 @@ public sealed class MpqArchive : IDisposable
         _rawHashTable = hashTable;
         _rawBlocks = blocks;
         _sectorSize = 512u << header.SectorShift;
-        FormatDescription = $"MPQ v{header.Version}，{header.BlockCount:N0} 个块，扇区 {_sectorSize:N0} B，头部偏移 0x{headerOffset:X}";
+        FormatDescription = $"MPQ v{header.Version + 1}，{header.BlockCount:N0} 个块，扇区 {_sectorSize:N0} B，头部偏移 0x{headerOffset:X}";
 
         _entries = new List<ArchiveEntry>((int)header.BlockCount);
         var hashByBlock = new Dictionary<int, (uint H1, uint H2, uint Locale)>();
@@ -114,6 +114,10 @@ public sealed class MpqArchive : IDisposable
             {
                 var header = TryReadHeader(stream, candidate);
                 if (header is null) continue;
+                // Header version 3 is MPQ format v4. Its HET/BET tables are not
+                // interchangeable with the classic hash/block tables parsed below.
+                if (header.Value.Version >= 3)
+                    throw new NotSupportedException("检测到 MPQ v4。当前版本尚未实现 HET/BET 扩展表解析，已停止读取以避免把扩展表误当成传统表。");
                 var blocks = ReadTables(stream, candidate, header.Value, out var hashTable);
                 return new MpqArchive(path, stream, candidate, header.Value, blocks, hashTable);
             }
