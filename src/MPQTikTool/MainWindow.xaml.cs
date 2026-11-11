@@ -53,6 +53,35 @@ public partial class MainWindow : Window
         }
     }
 
+    private void LoadListFile_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_archive.IsOpen)
+        {
+            MessageBox.Show("请先打开地图，再加载外部文件名库。", "提示", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new OpenFileDialog
+        {
+            Title = "选择 Warcraft III 外部文件名库",
+            Filter = "Listfile (*.txt;*.list)|*.txt;*.list|所有文件 (*.*)|*.*"
+        };
+        if (dialog.ShowDialog() != true) return;
+
+        try
+        {
+            _archive.AddExternalListFile(dialog.FileName);
+            _allEntries = _archive.EnumerateNamedFiles().ToList();
+            ApplyFilter();
+            StatusText.Text = $"外部文件名库加载完成，当前识别 {_allEntries.Count} 个具名资源";
+            MessageBox.Show($"已加载文件名库。当前可识别 {_allEntries.Count} 个具名资源。\n\n注意：文件名库只能匹配已有哈希项，不能保证恢复所有匿名资源。", "文件名库加载完成", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, "加载文件名库失败", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     private void ApplyFilter()
     {
         var query = SearchBox.Text.Trim();
