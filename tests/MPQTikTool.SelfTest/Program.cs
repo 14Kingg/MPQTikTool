@@ -139,7 +139,7 @@ static void CreateMiniMpq(string path, string filename, byte[] payload, bool enc
 
     var totalLength = dataPos + stored.Length;
     var header = new byte[headerSize];
-    "MPQ\\x1A"u8.CopyTo(header);
+    new byte[] { (byte)'M', (byte)'P', (byte)'Q', 0x1A }.CopyTo(header, 0);
     BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(4, 4), headerSize);
     BinaryPrimitives.WriteUInt32LittleEndian(header.AsSpan(8, 4), (uint)totalLength);
     BinaryPrimitives.WriteUInt16LittleEndian(header.AsSpan(12, 2), 0);
