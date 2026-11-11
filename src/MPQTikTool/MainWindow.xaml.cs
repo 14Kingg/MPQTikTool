@@ -95,6 +95,14 @@ public partial class MainWindow : Window
                 return;
             }
 
+            if (entry.Extension == ".mdx")
+            {
+                var bytes = _archive.ReadAllBytes(entry);
+                TextPreview.Text = MdxInspector.Describe(bytes);
+                TextPreview.Visibility = Visibility.Visible;
+                return;
+            }
+
             if (entry.Extension == ".blp")
             {
                 var bytes = _archive.ReadAllBytes(entry);
