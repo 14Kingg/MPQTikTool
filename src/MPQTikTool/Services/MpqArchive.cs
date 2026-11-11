@@ -439,20 +439,44 @@ public sealed class MpqArchive : IDisposable
     private void CopyRaw(ArchiveEntry entry, Stream destination, uint wanted,
         IProgress<long>? progress, CancellationToken cancellationToken)
     {
-        var buffer = new byte[1 << 16];
+        var bufferSize = 1 << 16; // divisible by four for the MPQ block cipher
+        var buffer = new byte[bufferSize];
         long remaining = wanted;
         var offset = _base + (long)entry.FilePos;
+        var encrypted = IsEncrypted(entry);
+        uint seed1 = 0, seed2 = 0xEEEEEEEE;
+        if (encrypted)
+        {
+            seed1 = GetRawFileKey(entry);
+        }
+
         while (remaining > 0)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var count = (int)Math.Min(buffer.Length, remaining);
+            // Keep all intermediate chunks DWORD-aligned so cipher state carries forward.
+            if (encrypted && remaining > count) count &= ~3;
             var chunk = ReadAt(offset, count);
+            if (encrypted) MpqHash.DecryptInPlace(chunk, ref seed1, ref seed2);
             destination.Write(chunk, 0, chunk.Length);
             offset += chunk.Length;
             remaining -= chunk.Length;
             progress?.Report(wanted - remaining);
             if (chunk.Length < count) break;
         }
+    }
+
+    private static uint GetRawFileKey(ArchiveEntry entry)
+    {
+        if (entry.OriginalName is not { Length: > 0 } name)
+            throw new InvalidDataException($"块 {entry.BlockIndex} 是加密的未压缩文件，缺少原始文件名，无法安全推导密钥。");
+        var normalized = name.Replace('/', '\\');
+        var slash = normalized.LastIndexOf('\\');
+        var basename = slash >= 0 ? normalized[(slash + 1)..] : normalized;
+        var key = MpqHash.HashString(basename, 3);
+        if ((entry.Flags & FlagFixKey) != 0)
+            key = unchecked((key + (uint)entry.FilePos) ^ entry.Size);
+        return key;
     }
 
     private void CopySingleUnit(ArchiveEntry entry, Stream destination, uint wanted,
@@ -467,7 +491,8 @@ public sealed class MpqArchive : IDisposable
         byte[] data;
         if (entry.CompressedSize < entry.Size) data = Inflate(raw, checked((int)entry.Size));
         else data = raw;
-        if (data.Length < entry.Size) Array.Resize(ref data, checked((int)entry.Size));
+        if (data.Length != entry.Size)
+            throw new InvalidDataException($"单块解压长度不匹配：期望 {entry.Size} B，实际 {data.Length} B。");
         WriteChunk(data, destination, wanted, progress, cancellationToken);
     }
 
@@ -505,7 +530,8 @@ public sealed class MpqArchive : IDisposable
             var data = ReadAt(_base + (long)entry.FilePos + start, checked((int)(end - start)));
             if (encrypted) MpqHash.DecryptInPlace(data, key!.Value + (uint)sector);
             if (data.Length < expected) data = Inflate(data, expected);
-            if (data.Length < expected) Array.Resize(ref data, expected);
+            if (data.Length != expected)
+                throw new InvalidDataException($"块 {entry.BlockIndex} 扇区 {sector} 解压长度不匹配：期望 {expected} B，实际 {data.Length} B。");
             var need = (int)Math.Min(expected, wanted - written);
             if (need > 0)
             {
@@ -607,7 +633,9 @@ public sealed class MpqArchive : IDisposable
                     : new DeflateStream(input, CompressionMode.Decompress, true);
                 using var output = new MemoryStream(expected);
                 inflater.CopyTo(output);
-                if (output.Length >= expected || output.Length > 0) return output.ToArray();
+                if (output.Length == expected) return output.ToArray();
+                if (output.Length > expected)
+                    throw new InvalidDataException($"解压长度异常：期望 {expected} B，实际 {output.Length} B。");
             }
             catch (Exception ex) { last = ex; }
         }
