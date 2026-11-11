@@ -92,16 +92,15 @@ public sealed class MpqArchiveService : IDisposable
     public void Dispose() => Close();
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-    private struct SFileFindData
+    internal struct SFileFindData
     {
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 1024)] public string FileName;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string FileName;
         [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 1024)] public string PlainName;
         public uint HashIndex;
         public uint BlockIndex;
         public uint FileSize;
         public uint FileFlags;
         public uint Compression;
-        public uint Unknown;
         public uint FileTimeLow;
         public uint FileTimeHigh;
         public uint Locale;
