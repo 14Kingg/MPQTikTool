@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".txt", ".lua", ".j", ".ai", ".fdf", ".ini", ".slk", ".toc", ".xml", ".json", ".md"
+        ".txt", ".lua", ".j", ".ai", ".fdf", ".ini", ".slk", ".toc", ".xml", ".json", ".md", ".mdl"
     };
 
     public MainWindow()
