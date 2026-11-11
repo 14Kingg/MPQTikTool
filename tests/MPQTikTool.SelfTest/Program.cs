@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
+using System.Text;
 using MPQTikTool.Services;
+
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
