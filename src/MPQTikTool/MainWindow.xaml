@@ -59,7 +59,7 @@
                             <Image x:Name="ImagePreview" Stretch="Uniform" />
                         </ScrollViewer>
                         <StackPanel x:Name="AudioPanel" Visibility="Collapsed" VerticalAlignment="Center" HorizontalAlignment="Center">
-                            <MediaElement x:Name="AudioPlayer" LoadedBehavior="Manual" UnloadedBehavior="Stop" Volume="0.8" Height="0"/>
+                            <MediaElement x:Name="AudioPlayer" LoadedBehavior="Manual" UnloadedBehavior="Stop" Volume="0.8" Height="1" Width="1" Opacity="0" IsHitTestVisible="False"/>
                             <TextBlock Text="音频资源" FontSize="18" HorizontalAlignment="Center" Margin="0,0,0,12"/>
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                                 <Button Content="播放" Padding="16,8" Margin="4" Click="AudioPlay_Click"/>
