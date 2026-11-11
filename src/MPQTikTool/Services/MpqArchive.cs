@@ -451,12 +451,18 @@ public sealed class MpqArchive : IDisposable
         if ((entry.Flags & (FlagCompress | FlagImplode)) == 0)
         {
             CopyRaw(entry, destination, wanted, progress, cancellationToken);
+            entry.DecryptionStatus = IsEncrypted(entry) ? "已解密" : "未加密";
+            entry.DecompressionStatus = "无需解压（原始块）";
+            entry.CrcStatus = "不适用";
             return;
         }
 
         if ((entry.Flags & FlagSingleUnit) != 0)
         {
             CopySingleUnit(entry, destination, wanted, progress, cancellationToken);
+            entry.DecryptionStatus = IsEncrypted(entry) ? "已解密" : "未加密";
+            entry.DecompressionStatus = "成功（单块）";
+            entry.CrcStatus = "单块文件不含扇区 CRC";
             return;
         }
 
