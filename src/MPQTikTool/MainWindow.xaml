@@ -8,6 +8,7 @@
             <DockPanel>
                 <StackPanel Orientation="Horizontal">
                     <Button Content="打开地图" Padding="18,8" Margin="0,0,8,0" Click="OpenMap_Click"/>
+                    <Button Content="加载外部文件名库" Padding="14,8" Margin="0,0,8,0" Click="LoadListFile_Click" ToolTip="导入 Warcraft III listfile，尝试恢复 MPQ 中缺失的资源路径"/>
                     <Button Content="导出选中" Padding="18,8" Margin="0,0,8,0" Click="ExportSelected_Click"/>
                     <Button Content="全部导出" Padding="18,8" Click="ExportAll_Click"/>
                 </StackPanel>
