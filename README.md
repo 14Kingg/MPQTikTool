@@ -1,56 +1,147 @@
 # MPQ Tik Tool
 
-Warcraft III 地图资源浏览器（Windows x64），面向 W3X/W3M/MPQ 地图资源检查与导出。
+通用 Warcraft III 地图资源浏览器（Windows x64）。面向 `.w3x` / `.w3m` / `.mpq`：
+**加载任意地图 → 预览任意资源 → 导出单个 / 筛选 / 全部资源 → 复用导出结果**。
+
+不再依赖 StormLib 原生 DLL。MPQ 读取由仓库内纯 C# 引擎 `src/MPQTikTool/Services/MpqArchive.cs` 完成。
 
 ## 下载与运行
 
-1. 打开仓库的 **Releases** 页面，下载 `MPQTikTool-win-x64.zip`。
-2. 解压 ZIP。
-3. 双击 `MPQTikTool.exe`。
+1. 打开仓库 **Releases**，下载 `MPQTikTool-win-x64.zip`。
+2. 解压后双击 `MPQTikTool.exe`（.NET 8 self-contained，无需安装 SDK）。
 
-Release 包为 .NET 8 self-contained x64 发布包，已随包携带 StormLib 及其运行时 DLL；目标电脑不需要单独安装 .NET SDK 或手工配置 StormLib。
+也可以在本地直接运行：
 
-## 当前功能
+```powershell
+dotnet run --project .\src\MPQTikTool\MPQTikTool.csproj
+```
 
-- 打开 Warcraft III `.w3x` / `.w3m` 和标准 MPQ 档案。
-- 使用 StormLib 枚举 MPQ 文件表，保留地图内资源路径。
-- 支持导入外部 Warcraft III listfile（文件名库），让 StormLib 按 MPQ 文件名哈希匹配并重新枚举资源；对缺少内置 `(listfile)` 的地图，这是恢复路径/文件名的重要手段。
-- 文件名、扩展名、资源类型搜索与筛选。
-- 单文件导出、整图批量导出（保留目录结构并阻止路径穿越）。
-- 批量导出会附带 CSV 资源清单与失败报告；导出范围是 StormLib 能枚举出名称的文件。
-- 对没有专用查看器的二进制文件提供十六进制/ASCII 预览，便于识别文件头和后续逆向。
-- 文本预览：TXT、LUA、JASS、AI、FDF、INI、SLK、TOC、XML、JSON、MD、MDL。
-- 常见图片预览：PNG、JPG、BMP、GIF、TIF。
-- BLP2 纹理预览：调色板、DXT1、DXT3、DXT5、BGRA mip level 0。
-- WAV/MP3 音频播放（依赖 Windows Media Foundation 支持的编码格式）。
-- 无专用预览器的二进制资源可直接原样导出。
+## 为什么换成自研 MPQ 引擎
+
+很多平台版地图（例如 KK 平台版本）**没有内置 `(listfile)`**，哈希表 locale 还被改成 `0xFF000000`，
+文件名被抹掉。StormLib 的 `SFileFindFirstFile` / `SFileOpenFileEx` 是按名字枚举和打开的，
+这类地图只能列出极少数已知文件，导出全部资源根本做不到。
+
+本工具按 **block-table 索引** 寻址，而不是按名字：
+
+- 解析 W3X 头 / MPQ 用户数据头，自动定位 `MPQ\x1A`（支持 v1/v2/v3/v4 的 64 位位置与扩展块表）。
+- 解密 hash table / block table，枚举**每一个块**，包含没有名字、被改名、locale 异常的块。
+- zlib / raw deflate 扇区解压、压缩掩码、单块文件、CRC 扇区表。
+- 加密文件：有原名时按 Storm 文件名哈希推导密钥；没有原名时，用扇区偏移表的已知明文
+  在 256 次尝试内求出密钥，因此**匿名加密资源也能解密导出**。
+- 名称恢复三级策略：内置标准名 → 导入外部 listfile（哈希匹配）→ 从 JASS/SLK/INI/MDX 内容中
+  挖掘路径并按哈希匹配。剩余块给稳定的推断名 `_unnamed/<类型>/B<块号>_<哈希><扩展名>`。
+- 类型识别按**文件头内容嗅探**，不依赖文件名：BLP1/BLP2、MDX、TGA、PNG/JPG/BMP/GIF/TIF、
+  WAV/MP3/OGG、文本、W3 二进制、十六进制兜底。
+
+## 功能
+
+| 功能 | 说明 |
+| --- | --- |
+| 打开地图 | 支持任意 w3x/w3m/mpq；自动定位 MPQ 头；显示格式、块数、扇区大小 |
+| 资源列表 | 名称 / 原名 or 推断 / 类型 / 格式 / 大小 / 块索引，可搜索、按类型与名称来源筛选 |
+| 任意资源预览 | 图片（BLP1 JPEG/调色板、BLP2、TGA、常见格式）、MDX Chunk 结构、文本、音频、十六进制；可切换「自动 / 文本 / 十六进制」 |
+| 分析资源 | 识别全部块的类型；从地图内容恢复文件名；「深度恢复文件名」扩大扫描范围 |
+| 导出选中 | 单选直接另存为；多选导出到目录 |
+| 导出筛选结果 | 只导出当前列表里的资源 |
+| 导出全部资源 | 导出**所有块**（含匿名块），流式解压、进度显示、可取消，防路径穿越 |
+| **还原地图** | 修复被保护的 hash 表 locale、写回 `(listfile)`、剔除损坏的空 WE 文件，生成 World Editor 可打开的 `.w3x`，并输出还原工程包与不可逆项报告 |
+| 复用清单 | 每次批量导出生成 `_MPQTikTool_ExportManifest.csv`、`_MPQTikTool_Manifest.json`、`_MPQTikTool_ExportErrors.txt`，含原名/推断名、类型、大小、Flags、Locale、双哈希、块索引、成功失败原因 |
+
+## 目标样本实测
+
+`不思议作战源文件KK平台版本.w3x`（570,233,086 B，17,389 个块，无 `(listfile)`，2 个加密块）：
+
+| 项目 | 结果 |
+| --- | --- |
+| 打开 / 建表 | 0.08 s |
+| 全部块类型识别 | 3.7 s |
+| 内容恢复文件名 | 2,195 个（+22 个标准名），17 s |
+| 全量导出校验 | **17,389 块 / 748,452,978 B / 0 失败** |
+| 资源构成 | BLP1 13,821、文本 2,481、MDX 850、TGA 132、MP3 27、WAV 6 等 |
+| 加密块 | `war3map.j` 等 2 个块无需文件名即可解密 |
+| 图片预览 | BLP1 JPEG / 调色板 / TGA 均解码出正常图像 |
+
+## 还原地图（deprotect）
+
+「打开地图 → 分析资源 → **还原地图**」会生成一份新的 `.w3x`，并在同目录生成 `<名字>_restore/` 工程包：
+
+```
+map/                 22 个 WE 关键文件（war3map.*），按原名导出，可直接导入新地图
+scripts/             平台 Lua 字节码 / 加密 JASS 包 / 生成的 JASS 占位脚本
+listfile.txt         写回还原版地图的完整 (listfile)
+name-map.csv         全部块：块号、原名或推断名、类型、大小、双哈希、flags、locale
+restore-report.md    还原结论、被清空文件清单、不可逆项、重建步骤
+restore-report.json  同上，便于程序处理
+```
+
+还原器**不重新压缩任何文件**：复制原始档案 → 修 hash 表 locale（`0xFF000000` → `0`）→ 把失效的 1 字节 `wtg/wct/wts/w3r/w3c` 哈希条目标记为删除（WE 会生成干净的空文件）→ 追加 `(listfile)` 文件与新块表。所有原始数据字节不变。
+
+### 目标样本的真实情况（先看清上限再动手）
+
+`不思议作战源文件KK平台版本.w3x` 是 **KKWE 平台地图**，不是传统 JASS 图：
+
+| 项目 | 状态 |
+| --- | --- |
+| 地形 / 摆设 / 阴影 / 小地图 / 预览图 / 地图设置 | ✅ 完整（w3e 260 KB、doo 126 KB、shd 590 KB、wpm 590 KB、w3i 761 B） |
+| 美术资源 | ✅ 17,389 块全部可导出（BLP1 13,821、MDX 850、TGA 132 等） |
+| GUI 触发器 / 物编 / 字符串表 | ❌ `wtg/wct/wts/w3r` 均 1 B，`w3c` 8 B，`w3u` 1.3 KB，`w3t/w3a/w3b/w3q` 12 B —— **已被物理清空，不可逆** |
+| JASS 源码 | ❌ `war3map.j` 仅 116 B 的 `GENERATED WITH KKWE` 占位注释 |
+| 平台逻辑 | ⚠️ `plugin_main2.lua` 是编译后的 Lua 字节码；138 KB 的 `KKWE PLUG-IN ENCRYPT JASS!` 是平台私有加密容器，只能原样导出 |
+| 保护手法 | hash 表 17,387 个条目 locale 改成 `0xFF000000`，只有 `war3map.j` 与 KKWE 加密包保持 locale 0（游戏能读、WE/MPQ 工具找不到） |
+| 资源原名 | 全字符串哈希爆破上限 2,219 / 17,389（12.8%）；其余无法反推 |
+
+**结论**：这张图的**逻辑层数据本来就不在文件里**，任何工具都无法把它还原成带触发器的可编辑工程。能还原的是「WE 可打开的地图骨架 + 地形摆设 + 全部美术资源 + 平台脚本原件」，触发器和物编需要按玩法重建。
+
+好消息是 MPQ 按文件名双哈希寻址，hash 表中保存的一直是**原始路径的哈希**——我们只是不知道明文名字。所以修复 locale 后，地图内对贴图/模型的引用在游戏和 WE 中仍然命中正确资源，不会变绿块；名字缺失只影响人工查看、改图和把资源搬到另一张地图。
+
+## 复用引擎（给其他项目用）
+
+`MpqArchive` 不依赖 WPF，可单独拷进任何 .NET 8 项目（配 `System.Text.Encoding.CodePages`）：
+
+```csharp
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+using var archive = MpqArchive.Open(@"D:\maps\any.w3x");
+
+archive.DetectKinds();                       // 按内容识别类型
+archive.RecoverNamesFromContent();           // 从地图文本/MDX 恢复文件名
+archive.AddListFile(@"D:\listfile.txt");     // 可选：外部文件名库
+
+foreach (var entry in archive.Entries)
+{
+    byte[] head = archive.ReadPrefix(entry, 4096);   // 预览 / 嗅探
+    // archive.Extract(entry, $@"D:\out\{entry.Name}"); // 导出
+    // archive.CopyTo(entry, outputStream);            // 流式写出
+}
+
+var restore = archive.RestoreTo(@"D:\maps\restored.w3x");   // 修 locale + 写 (listfile)
+MpqRestorer.WritePackage(archive, restore, @"D:\maps\restore_package");
+```
 
 ## 当前限制
 
-- BLP1/JPEG BLP 变体尚未解码。
-- MDX 可查看外层 Chunk 结构，但尚未提供真正的 3D 模型渲染、骨骼动画和材质预览；可导出原始模型文件。
-- 音频播放、物编数据结构化编辑、资源依赖图、地图内部加密资源的专用处理尚未完成。
-- 外部 listfile 只能恢复其中存在且哈希匹配的文件名；它不是万能字典。缺少内置和外部 listfile 时，当前 UI 仍不能保证枚举/导出所有匿名 hash/block 项。
-- 当前导出通过 StormLib 的文件 API 读取并解密/解压已识别文件，写出解压后的原始文件内容；不是把 MPQ 内部压缩扇区直接复制出来。
-- 加密且需要特定文件名作为解密密钥的资源，若无法推导文件名，可能无法正确提取。
+- MDX 只展示 Chunk 结构，不做 3D 渲染 / 骨骼动画。
+- 音频播放依赖 Windows Media Foundation 已安装的解码器（OGG/部分 MP3 可能只能导出，不能播放）。
+- BLP1 JPEG 的独立 alpha 平面仅在 EOI 后存在且尺寸匹配时叠加；BLP1 非标准 alphaBits 字段按无 alpha 处理。
+- 加密的「单块（single-unit）」文件若既没有原名又无法导入 listfile，无法推导密钥（会写失败报告，不影响其他资源）。
+- PKWARE implode 压缩与 MPQ patch 文件尚未实现；`_MPQTikTool_ExportErrors.txt` 会列出这类块。
+- 导出的是解密/解压后的原始文件内容，不是 MPQ 内部压缩扇区的原样复制。
 
 ## 本地构建
 
-需要 Windows 10/11 x64、.NET 8 SDK、Visual Studio C++ Build Tools（仅本地构建 StormLib 原生依赖时需要）。
+需要 Windows 10/11 x64 + .NET 8 SDK（不需要 Visual Studio C++ Build Tools 或 StormLib）。
 
 ```powershell
 dotnet restore .\src\MPQTikTool\MPQTikTool.csproj
 dotnet build .\src\MPQTikTool\MPQTikTool.csproj -c Release
-dotnet run --project .\src\MPQTikTool\MPQTikTool.csproj
 ```
 
 ## GitHub Actions
 
-- 推送到 `main` 或 PR 会执行 Windows x64 编译。
-- 构建任务会安装 x64 StormLib，发布 self-contained 应用并将 StormLib 及依赖 DLL 放入 ZIP。
-- `workflow_dispatch` 可手动运行构建并发布预览版。
-- 每次推送到 `main` 且构建成功后，都会自动创建一个 GitHub Preview Release，并上传 `MPQTikTool-win-x64.zip`。
+推送 `main` 或 PR 触发 Windows x64 编译；不再需要 vcpkg / StormLib。
+每次推送 `main` 构建成功后自动创建 Preview Release 并上传 `MPQTikTool-win-x64.zip`。
 
 ## 第三方组件
 
-MPQ 读写由 [StormLib](https://github.com/ladislav-zezula/StormLib) 提供。StormLib 使用其上游许可证；发布包会附带上游许可证文本。
+无原生依赖、无第三方 NuGet 运行时组件（仅 `System.Text.Encoding.CodePages` 用于中文文件名解码）。
+MPQ 格式参考 [StormLib](https://github.com/ladislav-zezula/StormLib) 的公开格式定义，但代码为独立实现。
