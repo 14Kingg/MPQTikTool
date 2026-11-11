@@ -637,8 +637,13 @@ public sealed class MpqArchive : IDisposable
     /// <summary>Builds the (listfile) content: every recovered name plus stable synthetic names.</summary>
     public string BuildListFile(IEnumerable<string>? extraNames = null)
     {
+        // A listfile is a dictionary of real archive paths, not a display-name manifest.
+        // Synthetic _unnamed/... aliases do not hash to the original MPQ hash entries,
+        // so writing them here would advertise paths that cannot actually be opened.
         var names = new List<string> { "(listfile)" };
-        foreach (var entry in _entries) names.Add(entry.Name);
+        foreach (var entry in _entries)
+            if (entry.OriginalName is { Length: > 0 } original)
+                names.Add(original);
         if (extraNames is not null) names.AddRange(extraNames);
         return string.Join("\r\n", names.Distinct(StringComparer.OrdinalIgnoreCase)) + "\r\n";
     }
@@ -690,7 +695,13 @@ public sealed class MpqArchive : IDisposable
             var block = hash[i + 3];
             if (block == HashFree || block == HashDeleted || block >= blockCount) continue;
             if (droppedBlocks.Contains(block)) { hash[i + 3] = HashDeleted; droppedEntries++; continue; }
-            if (hash[i + 2] != 0) { hash[i + 2] = 0; fixedLocales++; }
+            // Preserve legitimate locale IDs (e.g. 0x0409). Only normalize values
+            // with reserved high bits set, such as the observed 0xFF000000 tampering.
+            if ((hash[i + 2] & 0xFFFF0000) != 0)
+            {
+                hash[i + 2] = 0;
+                fixedLocales++;
+            }
         }
         var (lh1, lh2) = MpqHash.HashName("(listfile)");
         var slotCount = (int)hashCount;
