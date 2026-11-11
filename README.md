@@ -24,11 +24,10 @@ dotnet run --project .\src\MPQTikTool\MPQTikTool.csproj
 
 本工具按 **block-table 索引** 寻址，而不是按名字：
 
-- 解析 W3X 头 / MPQ 用户数据头，自动定位 `MPQ\x1A`（支持 v1/v2/v3/v4 的 64 位位置与扩展块表）。
+- 解析 W3X 头 / MPQ 用户数据头，自动定位 `MPQ\x1A`；当前传统 Hash/Block Table 解析覆盖 MPQ v1/v2/v3 的常见布局，**尚未实现 MPQ v4 的 HET/BET 表解析**。不能把 v4 当成已完整支持。
 - 解密 hash table / block table，枚举**每一个块**，包含没有名字、被改名、locale 异常的块。
 - zlib / raw deflate 扇区解压、压缩掩码、单块文件、CRC 扇区表。
-- 加密文件：有原名时按 Storm 文件名哈希推导密钥；没有原名时，用扇区偏移表的已知明文
-  在 256 次尝试内求出密钥，因此**匿名加密资源也能解密导出**。
+- 加密文件：有原名时按 Storm 文件名哈希推导密钥；没有原名时，对带扇区偏移表的加密文件，可利用表头已知明文尝试推导密钥；加密单块文件在缺少原名时仍无法通用恢复。
 - 名称恢复三级策略：内置标准名 → 导入外部 listfile（哈希匹配）→ 从 JASS/SLK/INI/MDX 内容中
   挖掘路径并按哈希匹配。剩余块给稳定的推断名 `_unnamed/<类型>/B<块号>_<哈希><扩展名>`。
 - 类型识别按**文件头内容嗅探**，不依赖文件名：BLP1/BLP2、MDX、TGA、PNG/JPG/BMP/GIF/TIF、
@@ -46,7 +45,7 @@ dotnet run --project .\src\MPQTikTool\MPQTikTool.csproj
 | 导出筛选结果 | 只导出当前列表里的资源 |
 | 导出全部资源 | 导出**所有块**（含匿名块），流式解压、进度显示、可取消，防路径穿越 |
 | **还原地图** | 修复被保护的 hash 表 locale、写回 `(listfile)`、剔除损坏的空 WE 文件，生成 World Editor 可打开的 `.w3x`，并输出还原工程包与不可逆项报告 |
-| 复用清单 | 每次批量导出生成 `_MPQTikTool_ExportManifest.csv`、`_MPQTikTool_Manifest.json`、`_MPQTikTool_ExportErrors.txt`，含原名/推断名、类型、大小、Flags、Locale、双哈希、块索引、成功失败原因 |
+| 复用清单 | 每次批量导出生成 `_MPQTikTool_ExportManifest.csv`、`_MPQTikTool_Manifest.json`、`_MPQTikTool_ExportErrors.txt`，含原名/推断别名、类型、大小、Flags、Locale、双哈希、块索引、成功失败原因 |
 
 ## 目标样本实测
 
@@ -124,7 +123,8 @@ MpqRestorer.WritePackage(archive, restore, @"D:\maps\restore_package");
 - 音频播放依赖 Windows Media Foundation 已安装的解码器（OGG/部分 MP3 可能只能导出，不能播放）。
 - BLP1 JPEG 的独立 alpha 平面仅在 EOI 后存在且尺寸匹配时叠加；BLP1 非标准 alphaBits 字段按无 alpha 处理。
 - 加密的「单块（single-unit）」文件若既没有原名又无法导入 listfile，无法推导密钥（会写失败报告，不影响其他资源）。
-- PKWARE implode 压缩与 MPQ patch 文件尚未实现；`_MPQTikTool_ExportErrors.txt` 会列出这类块。
+- 压缩算法目前尚未覆盖 MPQ 全部压缩掩码组合；PKWARE implode、BZip2、Huffman、ADPCM、Sparse 等需要继续实现并用样本验证。MPQ patch 文件尚未实现；不支持或解压长度校验失败的块会进入失败报告。
+- MPQ v4 的 HET/BET 扩展表尚未实现；还原器也只支持传统 32 位表布局和 4 GB 以内档案。
 - 导出的是解密/解压后的原始文件内容，不是 MPQ 内部压缩扇区的原样复制。
 
 ## 本地构建
