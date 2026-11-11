@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace MPQTikTool.Models;
 
 public sealed record ArchiveEntry(
