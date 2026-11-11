@@ -23,6 +23,7 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         InitializeComponent();
         EntriesGrid.ItemsSource = _visibleEntries;
     }
@@ -130,7 +131,7 @@ public partial class MainWindow : Window
         if (bytes.Length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE)
             return Encoding.Unicode.GetString(bytes, 2, bytes.Length - 2);
         try { return new UTF8Encoding(false, true).GetString(bytes); }
-        catch { return Encoding.Latin1.GetString(bytes); }
+        catch { return Encoding.GetEncoding(936).GetString(bytes); }
     }
 
     private void ClearPreview()
