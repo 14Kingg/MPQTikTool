@@ -16,9 +16,12 @@ Release 包为 .NET 8 self-contained x64 发布包，已随包携带 StormLib �
 - 使用 StormLib 枚举 MPQ 文件表，保留地图内资源路径。
 - 文件名、扩展名、资源类型搜索与筛选。
 - 单文件导出、整图批量导出（保留目录结构并阻止路径穿越）。
+- 批量导出会附带 CSV 资源清单与失败报告；导出范围是 StormLib 能枚举出名称的文件。
+- 对没有专用查看器的二进制文件提供十六进制/ASCII 预览，便于识别文件头和后续逆向。
 - 文本预览：TXT、LUA、JASS、AI、FDF、INI、SLK、TOC、XML、JSON、MD、MDL。
 - 常见图片预览：PNG、JPG、BMP、GIF、TIF。
 - BLP2 纹理预览：调色板、DXT1、DXT3、DXT5、BGRA mip level 0。
+- WAV/MP3 音频播放（依赖 Windows Media Foundation 支持的编码格式）。
 - 无专用预览器的二进制资源可直接原样导出。
 
 ## 当前限制
@@ -26,7 +29,7 @@ Release 包为 .NET 8 self-contained x64 发布包，已随包携带 StormLib �
 - BLP1/JPEG BLP 变体尚未解码。
 - MDX 可查看外层 Chunk 结构，但尚未提供真正的 3D 模型渲染、骨骼动画和材质预览；可导出原始模型文件。
 - 音频播放、物编数据结构化编辑、资源依赖图、地图内部加密资源的专用处理尚未完成。
-- 地图缺少 `(listfile)` 时，StormLib 能否给出可识别文件名取决于 MPQ 内部表和伪文件名能力；不能保证恢复原始文件名。未知资源仍应通过批量导出保留。
+- 地图缺少 `(listfile)` 时，StormLib 无法凭空知道哈希表中每个文件的原始路径/文件名；当前版本不能保证导出这些匿名哈希项。恢复它们需要外部 listfile 或对 MPQ hash/block table 做进一步扫描与命名猜测。
 - 加密且需要特定文件名作为解密密钥的资源，若无法推导文件名，可能无法正确提取。
 
 ## 本地构建
