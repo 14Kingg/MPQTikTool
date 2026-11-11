@@ -42,6 +42,10 @@ public sealed class ArchiveEntry
     public uint Hash2 { get; init; }
     public uint? FileKey { get; set; }
 
+    public string DecryptionStatus { get; set; } = "未读取";
+    public string DecompressionStatus { get; set; } = "未读取";
+    public string CrcStatus { get; set; } = "未读取";
+
     public ResourceKind Kind { get; set; } = ResourceKind.Unknown;
     public string Extension => Path.GetExtension(Name).ToLowerInvariant();
 
