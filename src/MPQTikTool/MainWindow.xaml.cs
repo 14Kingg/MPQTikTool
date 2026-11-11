@@ -18,7 +18,7 @@ public partial class MainWindow : Window
 
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".txt", ".lua", ".j", ".ai", ".fdf", ".ini", ".slk", ".toc", ".xml", ".json", ".md", ".mdl"
+        ".txt", ".lua", ".j", ".jass", ".ai", ".fdf", ".ini", ".slk", ".toc", ".xml", ".json", ".md", ".mdl"
     };
 
     public MainWindow()
@@ -84,7 +84,7 @@ public partial class MainWindow : Window
     {
         ClearPreview();
         PreviewName.Text = entry.Name;
-        PreviewInfo.Text = $"{entry.Category}  |  {entry.DisplaySize}  |  Flags: 0x{entry.Flags:X8}";
+        PreviewInfo.Text = $"{entry.Category}  |  {entry.DisplaySize}  |  压缩: {entry.CompressedSize:N0} B  |  Locale: {entry.Locale}  |  Flags: 0x{entry.Flags:X8}";
         try
         {
             if (TextExtensions.Contains(entry.Extension))
@@ -126,9 +126,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            FallbackPreview.Text = entry.Extension is ".mdx" or ".mdl"
-                    ? "Warcraft III 模型：已识别，3D 模型查看器将在后续版本接入。"
-                    : "该格式暂不支持内嵌预览。可以使用“导出选中”保存原始资源。";
+            FallbackPreview.Text = "该格式暂不支持内嵌预览。可以使用“导出选中”保存原始资源。";
             FallbackPreview.Visibility = Visibility.Visible;
         }
         catch (Exception ex)
