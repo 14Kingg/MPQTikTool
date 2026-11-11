@@ -31,7 +31,7 @@
                     <ComboBoxItem Content="全部类型" IsSelected="True"/>
                     <ComboBoxItem Content="图片"/><ComboBoxItem Content="模型"/>
                     <ComboBoxItem Content="音频"/><ComboBoxItem Content="文本/脚本"/>
-                    <ComboBoxItem Content="物编数据"/><ComboBoxItem Content="其他"/>
+                    <ComboBoxItem Content="物编数据"/><ComboBoxItem Content="地图数据"/><ComboBoxItem Content="其他"/>
                 </ComboBox>
                 <TextBlock x:Name="CountText" Margin="14,0" VerticalAlignment="Center" Foreground="#FF9BA7B8"/>
             </DockPanel>
