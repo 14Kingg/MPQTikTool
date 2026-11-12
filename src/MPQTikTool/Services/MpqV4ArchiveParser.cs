@@ -239,7 +239,7 @@ public static class MpqV4ArchiveParser
 
         return new ParsedBet(
             new TableInfo("BET", h.BetTableOffset, h.BetTableStoredSize, raw.Version,
-                raw.DeclaredDataSize, tableSize, raw.Md5, raw.Md5Valid, raw.IsCompressed, true),
+                raw.DeclaredDataSize, tableSize, raw.Md5, raw.Md5Present, raw.Md5Valid, raw.IsCompressed, true),
             blocks);
     }
 
