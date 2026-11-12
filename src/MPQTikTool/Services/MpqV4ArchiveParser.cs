@@ -83,6 +83,8 @@ public static class MpqV4ArchiveParser
             Convert.ToHexString(rawHeader.AsSpan(0xB0, 16)),
             Convert.ToHexString(expectedHeaderMd5), true);
 
+        ValidateTableRegions(header);
+
         var diagnostics = new List<string> { "MPQ v4 Header MD5：通过" };
         ulong parsedHetBitsMask = 0;
         var parsedHetNameHashBits = 0;
@@ -120,6 +122,29 @@ public static class MpqV4ArchiveParser
         }
 
         return new Result(header, blocks, hetInfo, betInfo, diagnostics, hetInfo is null ? null : checked((uint)parsedHetNameHashBits));
+    }
+
+    private static void ValidateTableRegions(Header header)
+    {
+        var regions = new List<(string Name, ulong Start, ulong End)>();
+        Add("HET", header.HetTableOffset, header.HetTableStoredSize);
+        Add("BET", header.BetTableOffset, header.BetTableStoredSize);
+        Add("Hash", (ulong)header.HashTableOffsetHigh << 32, header.HashTableStoredSize);
+        Add("Block", (ulong)header.BlockTableOffsetHigh << 32, header.BlockTableStoredSize);
+        Add("HiBlock", header.HiBlockTableOffset, header.HiBlockTableStoredSize);
+        regions.Sort((a, b) => a.Start.CompareTo(b.Start));
+        for (var i = 1; i < regions.Count; i++)
+            if (regions[i].Start < regions[i - 1].End)
+                throw new InvalidDataException($"MPQ v4 表区域重叠：{regions[i - 1].Name} 与 {regions[i].Name}。");
+
+        void Add(string name, ulong start, ulong size)
+        {
+            if (start == 0 && size == 0) return;
+            if (start == 0 || size == 0 || start < HeaderLength ||
+                start > header.ArchiveSize || size > header.ArchiveSize - start)
+                throw new InvalidDataException($"MPQ v4 {name} 表偏移/长度超出 ArchiveSize64。");
+            regions.Add((name, start, checked(start + size)));
+        }
     }
 
     private sealed record ParsedHet(TableInfo Info, Dictionary<int, ulong> NameHashes, int NameHash2Bits);
@@ -238,7 +263,7 @@ public static class MpqV4ArchiveParser
             var filePos = ReadBits(fileBits, bitBase + posIndex, checked((int)posBits));
             var fileSize = checked((uint)ReadBits(fileBits, bitBase + sizeIndex, checked((int)sizeBits)));
             var compressedSize = checked((uint)ReadBits(fileBits, bitBase + cmpIndex, checked((int)cmpBits)));
-            var flag = flagCount == 0 ? 0u : ReadBits(fileBits, bitBase + flagIndex, checked((int)flagBits)) is var flagSlot && flagSlot < flags.Length
+            var flag = flagCount == 0 ? 0u : ReadBits(fileBits, bitBase + flagIndex, checked((int)flagBits)) is var flagSlot && flagSlot < (ulong)flags.Length
                 ? flags[(int)flagSlot] : throw new InvalidDataException($"BET Block {i} 的 FlagIndex 越界。");
             var nameHash2 = nameHashBits == 0 ? 0UL :
                 ReadBits(nameBits, checked((ulong)i * nameHashTotalBits), checked((int)nameHashBits));
