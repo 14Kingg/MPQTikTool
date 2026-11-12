@@ -41,6 +41,7 @@ public sealed class ArchiveEntry
     public uint Hash1 { get; init; }
     public uint Hash2 { get; init; }
     public uint? FileKey { get; set; }
+    public ulong? ExtendedNameHash { get; set; }
 
     public string DecryptionStatus { get; set; } = "未读取";
     public string DecompressionStatus { get; set; } = "未读取";
