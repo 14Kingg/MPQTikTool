@@ -34,7 +34,8 @@ public static class MpqV4ArchiveParser
         bool Md5Valid, bool IsCompressed, bool IsEncrypted);
 
     public sealed record Result(Header MpqHeader, IReadOnlyList<BlockEntry> Blocks,
-        TableInfo? HetInfo, TableInfo? BetInfo, IReadOnlyList<string> Diagnostics);
+        TableInfo? HetInfo, TableInfo? BetInfo, IReadOnlyList<string> Diagnostics,
+        uint? NameHashBitSize);
 
     public static Result Read(string path, long headerOffset = 0)
     {
@@ -118,7 +119,7 @@ public static class MpqV4ArchiveParser
             throw new InvalidDataException("检测到 HET 表，但缺少对应 BET 表，无法重建 Block 条目。");
         }
 
-        return new Result(header, blocks, hetInfo, betInfo, diagnostics);
+        return new Result(header, blocks, hetInfo, betInfo, diagnostics, hetInfo is null ? null : checked((uint)(parsedHetNameHashBits + 8)));
     }
 
     private sealed record ParsedHet(TableInfo Info, Dictionary<int, ulong> NameHashes, int NameHash2Bits);
