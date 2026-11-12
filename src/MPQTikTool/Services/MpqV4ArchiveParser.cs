@@ -13,7 +13,7 @@ public static class MpqV4ArchiveParser
     private const uint HetSignature = 0x1A544548;
     private const uint BetSignature = 0x1A544542;
     private const int HetHeaderBodySize = 32;
-    private const int BetHeaderBodySize = 72;
+    private const int BetHeaderBodySize = 76;
     private const int MaxExtendedTableSize = 0x00100000;
 
     public sealed record Header(
@@ -83,6 +83,7 @@ public static class MpqV4ArchiveParser
             Convert.ToHexString(expectedHeaderMd5), true);
 
         var diagnostics = new List<string> { "MPQ v4 Header MD5：通过" };
+        ulong parsedHetBitsMask = 0;
         TableInfo? hetInfo = null;
         TableInfo? betInfo = null;
         IReadOnlyList<BlockEntry> blocks = Array.Empty<BlockEntry>();
@@ -93,6 +94,7 @@ public static class MpqV4ArchiveParser
             var parsedHet = ReadHet(stream, headerOffset, header);
             hetInfo = parsedHet.Info;
             nameHashes = parsedHet.NameHashes;
+            parsedHetBitsMask = parsedHet.NameHash2Bits == 64 ? ulong.MaxValue : ((1UL << parsedHet.NameHash2Bits) - 1);
             diagnostics.Add($"HET：{parsedHet.Info.TableSize} B，MD5 {(parsedHet.Info.Md5Valid ? "通过" : "失败")}，{nameHashes.Count} 个名称哈希索引");
         }
 
@@ -100,8 +102,11 @@ public static class MpqV4ArchiveParser
         {
             var parsedBet = ReadBet(stream, headerOffset, header);
             betInfo = parsedBet.Info;
+            var lowerMask = parsedHetBitsMask;
             blocks = parsedBet.Blocks.Select(b =>
-                b with { NameHash = nameHashes.TryGetValue(b.Index, out var hash) ? hash : null }).ToArray();
+                b with { NameHash = nameHashes.TryGetValue(b.Index, out var hash)
+                    ? hash | ((b.NameHash ?? 0UL) & lowerMask)
+                    : null }).ToArray();
             diagnostics.Add($"BET：{parsedBet.Info.TableSize} B，MD5 {(parsedBet.Info.Md5Valid ? "通过" : "失败")}，{blocks.Count} 个 Block 条目");
         }
         else if (hetInfo is not null)
@@ -112,7 +117,7 @@ public static class MpqV4ArchiveParser
         return new Result(header, blocks, hetInfo, betInfo, diagnostics);
     }
 
-    private sealed record ParsedHet(TableInfo Info, Dictionary<int, ulong> NameHashes);
+    private sealed record ParsedHet(TableInfo Info, Dictionary<int, ulong> NameHashes, int NameHash2Bits);
     private sealed record ParsedBet(TableInfo Info, IReadOnlyList<BlockEntry> Blocks);
 
     private static ParsedHet ReadHet(FileStream stream, long baseOffset, Header h)
@@ -160,7 +165,7 @@ public static class MpqV4ArchiveParser
         return new ParsedHet(
             new TableInfo("HET", h.HetTableOffset, h.HetTableStoredSize, raw.Version,
                 raw.DeclaredDataSize, tableSize, raw.Md5, raw.Md5Valid, raw.IsCompressed, true),
-            names);
+            names, checked((int)nameHash2Bits));
     }
 
     private static ParsedBet ReadBet(FileStream stream, long baseOffset, Header h)
