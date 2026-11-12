@@ -161,7 +161,7 @@ public static class MpqV4ArchiveParser
         for (var i = 0; i < totalCount; i++)
         {
             var hash1 = nameBytes[(int)i];
-            if (hash1 == 0xFF) continue;
+            if (hash1 == 0x00) continue;
             occupiedCount++;
             var betIndex = ReadBits(indexBytes, checked((ulong)i * indexBitsTotal), checked((int)indexBits));
             if (betIndex > int.MaxValue) throw new InvalidDataException("HET BET 索引超出支持范围。");
