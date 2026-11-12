@@ -47,9 +47,10 @@ public sealed class MpqArchive : IDisposable
     public string FormatDescription { get; }
     public IReadOnlyList<ArchiveEntry> Entries => _entries;
     public long FileLength => _stream.Length;
+    public MpqV4ArchiveParser.Result? V4Info { get; }
 
     private MpqArchive(string path, FileStream stream, long headerOffset, HeaderInfo header,
-        BlockInfo[] blocks, uint[] hashTable, ulong?[]? extendedNameHashes = null, uint? hetNameHashBitSize = null)
+        BlockInfo[] blocks, uint[] hashTable, ulong?[]? extendedNameHashes = null, uint? hetNameHashBitSize = null, MpqV4ArchiveParser.Result? v4Info = null)
     {
         ArchivePath = path;
         _stream = stream;
@@ -58,6 +59,7 @@ public sealed class MpqArchive : IDisposable
         _rawHashTable = hashTable;
         _rawBlocks = blocks;
         _hetNameHashBitSize = hetNameHashBitSize;
+        V4Info = v4Info;
         _sectorSize = 512u << header.SectorShift;
         FormatDescription = $"MPQ v{header.Version + 1}，{header.BlockCount:N0} 个块，扇区 {_sectorSize:N0} B，头部偏移 0x{headerOffset:X}";
 
@@ -131,7 +133,7 @@ public sealed class MpqArchive : IDisposable
                         };
                         var hashes = v4.Blocks.Select(b => b.NameHash).ToArray();
                         return new MpqArchive(path, stream, candidate, v4Header, v4Blocks,
-                            Array.Empty<uint>(), hashes, v4.NameHashBitSize);
+                            Array.Empty<uint>(), hashes, v4.NameHashBitSize, v4);
                     }
 
                     // Some v4 archives retain only the classic tables. They are accepted
