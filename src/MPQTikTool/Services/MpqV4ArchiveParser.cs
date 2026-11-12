@@ -19,7 +19,7 @@ public static class MpqV4ArchiveParser
     public sealed record Header(
         uint HeaderSize, ulong ArchiveSize, ushort FormatVersion, ushort SectorShift,
         ulong HiBlockTableOffset, ushort HashTableOffsetHigh, ushort BlockTableOffsetHigh,
-        ulong BetTableOffset, ulong HetTableOffset, ulong HashTableStoredSize,
+        ulong HashTableOffset, ulong BlockTableOffset, ulong BetTableOffset, ulong HetTableOffset, ulong HashTableStoredSize,
         ulong BlockTableStoredSize, ulong HiBlockTableStoredSize,
         ulong HetTableStoredSize, ulong BetTableStoredSize, uint RawChunkSize,
         string BlockTableMd5, string HashTableMd5, string HiBlockTableMd5,
@@ -74,6 +74,8 @@ public static class MpqV4ArchiveParser
         var header = new Header(
             headerSize, archiveSize, version, U16(0x0E),
             U64(0x20), U16(0x28), U16(0x2A),
+            (ulong)U32(0x10) | ((ulong)U16(0x28) << 32),
+            (ulong)U32(0x14) | ((ulong)U16(0x2A) << 32),
             U64(0x34), U64(0x3C), U64(0x44), U64(0x4C),
             U64(0x54), U64(0x5C), U64(0x64), U32(0x6C),
             Convert.ToHexString(rawHeader.AsSpan(0x70, 16)),
@@ -129,8 +131,8 @@ public static class MpqV4ArchiveParser
         var regions = new List<(string Name, ulong Start, ulong End)>();
         Add("HET", header.HetTableOffset, header.HetTableStoredSize);
         Add("BET", header.BetTableOffset, header.BetTableStoredSize);
-        Add("Hash", (ulong)header.HashTableOffsetHigh << 32, header.HashTableStoredSize);
-        Add("Block", (ulong)header.BlockTableOffsetHigh << 32, header.BlockTableStoredSize);
+        Add("Hash", header.HashTableOffset, header.HashTableStoredSize);
+        Add("Block", header.BlockTableOffset, header.BlockTableStoredSize);
         Add("HiBlock", header.HiBlockTableOffset, header.HiBlockTableStoredSize);
         regions.Sort((a, b) => a.Start.CompareTo(b.Start));
         for (var i = 1; i < regions.Count; i++)
