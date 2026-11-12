@@ -218,10 +218,31 @@ public sealed class MpqArchive : IDisposable
         }
 
         var available = stream.Length - offset;
-        if (hashPos < 0 || blockPos < 0 ||
-            (hashCount != 0 && (hashPos == 0 || hashPos + (long)hashCount * 16 > available)) ||
-            (blockCount != 0 && (blockPos == 0 || blockPos + (long)blockCount * 16 > available))) return null;
-        if (hiBlockPos != 0 && hiBlockPos + (long)blockCount * 2 > available) return null;
+        if (hashPos < 0 || blockPos < 0) return null;
+        if (version >= 3 && headerSize >= 0xD0)
+        {
+            ulong Read64(int at) => at + 8 <= raw.Length ? BinaryPrimitives.ReadUInt64LittleEndian(raw.AsSpan(at, 8)) : 0;
+            var hashStoredSize = Read64(0x44);
+            var blockStoredSize = Read64(0x4C);
+            var hiBlockStoredSize = Read64(0x54);
+            if ((hashCount != 0 && hashPos == 0) || (blockCount != 0 && blockPos == 0)) return null;
+            if (!ValidV4Range(hashPos, hashStoredSize) ||
+                !ValidV4Range(blockPos, blockStoredSize) ||
+                !ValidV4Range(hiBlockPos, hiBlockStoredSize)) return null;
+
+            bool ValidV4Range(long pos, ulong size)
+            {
+                if (pos == 0 && size == 0) return true;
+                if (pos <= 0 || size == 0 || (ulong)pos > (ulong)available) return false;
+                return size <= (ulong)available - (ulong)pos;
+            }
+        }
+        else
+        {
+            if ((hashCount != 0 && (hashPos == 0 || hashPos + (long)hashCount * 16 > available)) ||
+                (blockCount != 0 && (blockPos == 0 || blockPos + (long)blockCount * 16 > available))) return null;
+            if (hiBlockPos != 0 && hiBlockPos + (long)blockCount * 2 > available) return null;
+        }
 
         return new HeaderInfo(headerSize, Read32(8), version, shift, hashPos, blockPos, hashCount, blockCount, hiBlockPos);
     }
@@ -554,7 +575,7 @@ public sealed class MpqArchive : IDisposable
     private void CopySingleUnit(ArchiveEntry entry, Stream destination, uint wanted,
         IProgress<long>? progress, CancellationToken cancellationToken)
     {
-        var raw = ReadAt(_base + (long)entry.FilePos, checked((int)entry.CompressedSize));
+        var raw = ReadAt(GetAbsoluteOffset(entry.FilePos), checked((int)entry.CompressedSize));
         if (IsEncrypted(entry))
         {
             var key = GetFileKey(entry, null);
