@@ -347,8 +347,12 @@ static void Write32(Span<byte> data, int offset, uint value) =>
 static void WriteBits(Span<byte> data, int bitOffset, int bitCount, ulong value)
 {
     for (var bit = 0; bit < bitCount; bit++)
-        if ((value & (1UL << bit)) != 0)
-            data[(bitOffset + bit) >> 3] |= (byte)(1 << ((bitOffset + bit) & 7));
+    {
+        var byteIndex = (bitOffset + bit) >> 3;
+        var mask = (byte)(1 << ((bitOffset + bit) & 7));
+        if ((value & (1UL << bit)) != 0) data[byteIndex] |= mask;
+        else data[byteIndex] &= (byte)~mask;
+    }
 }
 
 static void CreateSectorCrcMpq(string path, byte[] payload, bool corruptCrc)
