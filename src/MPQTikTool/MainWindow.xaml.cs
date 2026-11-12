@@ -50,6 +50,22 @@ public partial class MainWindow : Window
             _allEntries = archive.Entries.ToList();
             ClearPreview();
             MapPathText.Text = dialog.FileName;
+            if (archive.V4Info is { } v4)
+            {
+                var h = v4.MpqHeader;
+                MpqHeaderInfoText.Text =
+                    $"格式：MPQ v4（version={h.FormatVersion}） · HeaderSize=0x{h.HeaderSize:X} · ArchiveSize64={h.ArchiveSize:N0} B · SectorShift={h.SectorShift}\n" +
+                    $"HET：0x{h.HetTableOffset:X} / {h.HetTableStoredSize:N0} B · BET：0x{h.BetTableOffset:X} / {h.BetTableStoredSize:N0} B · RawChunkSize={h.RawChunkSize:N0}\n" +
+                    $"Header MD5：{(h.HeaderMd5Valid ? "通过" : "失败")} · HET MD5：{v4.HetInfo?.Md5Present switch { true => v4.HetInfo.Md5Valid ? "通过" : "失败", false => "未提供", null => "不存在" }} · BET MD5：{v4.BetInfo?.Md5Present switch { true => v4.BetInfo.Md5Valid ? "通过" : "失败", false => "未提供", null => "不存在" }}";
+                MpqV4TablesGrid.ItemsSource = new[] { v4.HetInfo, v4.BetInfo }.Where(t => t is not null).ToList();
+                MpqV4BlocksGrid.ItemsSource = v4.Blocks;
+            }
+            else
+            {
+                MpqHeaderInfoText.Text = $"格式：{archive.FormatDescription} · 当前使用传统 Hash/Block Table 解析。";
+                MpqV4TablesGrid.ItemsSource = Array.Empty<MpqV4ArchiveParser.TableInfo>();
+                MpqV4BlocksGrid.ItemsSource = Array.Empty<MpqV4ArchiveParser.BlockEntry>();
+            }
             ApplyFilter();
             StatusText.Text = $"已发现 {_allEntries.Count:N0} 个资源块 · {archive.FormatDescription}";
             await AnalyseAsync(ct, detectKinds: true, prefixCap: 96 * 1024);
