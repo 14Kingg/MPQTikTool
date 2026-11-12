@@ -290,7 +290,7 @@ static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHe
         WriteBits(betBody.AsSpan(80, 7), 0, 32, filePos);
         bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
     }
-    if (filePos != headerSize + het.Length + bet.Length)
+    if (filePos != checked((uint)(headerSize + het.Length + bet.Length)))
         throw new InvalidOperationException("Compressed BET fixture offset did not stabilize.");
 
     var payload = Encoding.ASCII.GetBytes("hello");
