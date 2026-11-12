@@ -145,3 +145,49 @@ UI 采用左侧工作区导航 + 中央数据视图 + 右侧检查器 + 底部�
 ## 真实性原则
 
 “完全可逆”只适用于输入中实际存在且可解密、可正确解释的数据。已物理删除的数据、缺少密钥的私有加密内容、未知且不可判定的变换，不可能凭空恢复。工具必须保存原始证据并明确标注边界。
+
+
+## MPQ v4 实施进展（2026-11-12）
+
+### 已落地并通过 CI 的能力
+
+代码入口：`src/MPQTikTool/Services/MpqV4ArchiveParser.cs`。
+
+- 解析完整 0xD0 v4 Header：ArchiveSize64、Hash/Block/HiBlock/HET/BET 偏移和存储长度、RawChunkSize、六组 MD5 字段。
+- 对 Header 的 MD5_MpqHeader 执行 MD5 校验；对存在 MD5 字段的 HET/BET 原始存储数据执行校验。
+- 对 HET/BET 扩展表执行表密钥解密；支持未压缩和 ZLIB 压缩表，其他压缩掩码明确报不支持。
+- 解析 HET 的 NameHash1、BET 索引位数组；解析 BET 的 64 位 FilePos、FileSize、CompressedSize、FlagIndex、NameHash2。
+- 使用 Jenkins lookup3 计算候选文件名哈希，将 HET/BET 名称哈希索引与外部 Listfile 匹配。
+- `MpqArchive.Open` 已接入 HET/BET 读取路径，可按 BET Block 导出资源；v4 写回仍明确禁止。
+- MPQ 结构页已绑定真实 v4 Header、HET/BET 表信息和 BET Block 条目；资源页显示解密/解压/CRC 状态。
+
+### 自动化测试
+
+自包含 SelfTest 当前 15 项，覆盖 Header MD5、HET/BET 原始 MD5、未压缩表、加密表、ZLIB 表、位字段、名称哈希、BET Block 读取和原始资源导出，以及 CRC 和传统 MPQ 基础路径。
+
+最近一次完整 Windows CI：`43134361998`，Build、自测、Windows x64 发布、产物校验、ZIP 和预览发布全部成功。该结果对应当次提交，不等同于真实大型地图的端到端验收。
+
+### 真实样本候选集（尚未完成本项目交叉验证）
+
+StormLib 9.31 测试清单列出了以下真实 v4 档案，适合作为外部回归集：
+
+- `MPQ_2013_v4_EmptyMpq.MPQ`（208 B）
+- `MPQ_2013_v4_SC2_EmptyMap.SC2Map`（25,058 B）
+- `MPQ_2011_v4_InvalidHetEntryCount.MPQ`（206,164 B，畸形 HET 负样本）
+- `MPQ_2023_v4_UTF8.s2ma`
+- `MPQ_2013_v4_locale-enGB.MPQ`
+- `MPQ_2012_v4_OldWorld.MPQ`（约 1.85 GB）
+- `MPQ_2013_v4_world.MPQ`（约 2.62 GB）
+
+来源清单：[StormLib v9.31 test manifest](https://github.com/ladislav-zezula/StormLib/blob/master/test/stormlib-test-001.txt)。StormLib 测试资源目录的说明：[test data README mirror](https://gitlab.eientei.org/mirrors/libultraship/-/blob/d3e42d7f4e56bfad29aafc1b63a8d09f1d8d720a/extern/StormLib/test/Readme.txt)。这些是候选测试资产清单，不代表二进制样本已经纳入本仓库或本项目已通过交叉验证。
+
+### 明确未完成
+
+- 真实 v4 样本交叉验证尚未完成；当前 HET/BET 验收主要依赖独立合成 fixture。
+- HET/BET 表压缩目前支持 ZLIB；其他压缩掩码尚未接入。
+- v4 传统 Hash/Block/HiBlock 表的 MD5 验证、压缩传统表解析尚未完成。
+- 64 位 Block 偏移字段和范围检查已接入，但尚无大于 4 GB 的真实稀疏档案端到端读写样本。
+- v4 HET/BET 写回、完整重打包和独立工具复验尚未实现。
+- 压缩算法组合掩码（PKWARE、BZip2、Huffman、ADPCM、Sparse 等）仍需逐项移植和样本验证。
+
+因此当前状态应标记为：**MPQ v4 Header/HET/BET 读取原型已实现，合成样本测试通过；真实样本交叉验证和完整 v4 可逆重建仍未完成。**
