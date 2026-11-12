@@ -135,8 +135,9 @@ internal static class MpqHash
     public static ulong HashJenkins64(string name, uint bitSize)
     {
         if (bitSize is < 8 or > 64) throw new ArgumentOutOfRangeException(nameof(bitSize));
-        var normalized = name.Replace('/', '\\').ToLowerInvariant();
-        var bytes = Encoding.UTF8.GetBytes(normalized);
+        var bytes = Encoding.UTF8.GetBytes(name.Replace('/', '\\'));
+        for (var i = 0; i < bytes.Length; i++)
+            if (bytes[i] >= (byte)'A' && bytes[i] <= (byte)'Z') bytes[i] += 32;
         uint pc = 2, pb = 1;
         HashLittle2(bytes, ref pc, ref pb);
         var hash = ((ulong)pb << 32) | pc;
