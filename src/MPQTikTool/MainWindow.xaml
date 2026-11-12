@@ -119,11 +119,13 @@
                 <DataGrid x:Name="MpqV4TablesGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" Height="150">
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="表" Binding="{Binding Kind}" Width="55"/>
-                        <DataGridTextColumn Header="相对偏移" Binding="{Binding Offset, StringFormat=0x{0:X}}" Width="110"/>
+                        <DataGridTextColumn Header="版本" Binding="{Binding Version}" Width="45"/>
+                        <DataGridTextColumn Header="相对偏移" Binding="{Binding Offset, StringFormat='0x{0:X}'}" Width="110"/>
                         <DataGridTextColumn Header="存储长度" Binding="{Binding StoredSize}" Width="85"/>
                         <DataGridTextColumn Header="DataSize" Binding="{Binding DeclaredDataSize}" Width="85"/>
                         <DataGridTextColumn Header="解压长度" Binding="{Binding TableSize}" Width="85"/>
                         <DataGridTextColumn Header="压缩" Binding="{Binding IsCompressed}" Width="55"/>
+                        <DataGridTextColumn Header="加密" Binding="{Binding IsEncrypted}" Width="55"/>
                         <DataGridTextColumn Header="MD5" Binding="{Binding Md5Valid}" Width="55"/>
                         <DataGridTextColumn Header="MD5 值" Binding="{Binding Md5}" Width="*"/>
                     </DataGrid.Columns>
@@ -136,8 +138,8 @@
                         <DataGridTextColumn Header="文件偏移" Binding="{Binding FileOffset, StringFormat=0x{0:X}}" Width="130"/>
                         <DataGridTextColumn Header="原始大小" Binding="{Binding FileSize}" Width="85"/>
                         <DataGridTextColumn Header="压缩大小" Binding="{Binding CompressedSize}" Width="85"/>
-                        <DataGridTextColumn Header="Flags" Binding="{Binding Flags, StringFormat=0x{0:X8}}" Width="100"/>
-                        <DataGridTextColumn Header="HET/BET NameHash" Binding="{Binding NameHash, StringFormat=0x{0:X16}}" Width="*"/>
+                        <DataGridTextColumn Header="Flags" Binding="{Binding Flags, StringFormat='0x{0:X8}'}" Width="100"/>
+                        <DataGridTextColumn Header="HET/BET NameHash" Binding="{Binding NameHash, StringFormat='0x{0:X16}'}" Width="*"/>
                     </DataGrid.Columns>
                 </DataGrid>
             </GroupBox>
