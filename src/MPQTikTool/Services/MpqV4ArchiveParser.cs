@@ -122,7 +122,7 @@ public static class MpqV4ArchiveParser
 
     private static ParsedHet ReadHet(FileStream stream, long baseOffset, Header h)
     {
-        var raw = ReadExtendedTable(stream, baseOffset, h.HetTableOffset, h.HetTableStoredSize,
+        var raw = ReadExtendedTable(stream, baseOffset, h.ArchiveSize, h.HetTableOffset, h.HetTableStoredSize,
             HetSignature, h.HetTableMd5, "(hash table)");
         var body = raw.Body;
         if (body.Length < HetHeaderBodySize) throw new InvalidDataException("HET Header 被截断。");
@@ -164,13 +164,13 @@ public static class MpqV4ArchiveParser
 
         return new ParsedHet(
             new TableInfo("HET", h.HetTableOffset, h.HetTableStoredSize, raw.Version,
-                raw.DeclaredDataSize, tableSize, raw.Md5, raw.Md5Valid, raw.IsCompressed, true),
+                raw.DeclaredDataSize, tableSize, raw.Md5, raw.Md5Present, raw.Md5Valid, raw.IsCompressed, true),
             names, checked((int)nameHash2Bits));
     }
 
     private static ParsedBet ReadBet(FileStream stream, long baseOffset, Header h)
     {
-        var raw = ReadExtendedTable(stream, baseOffset, h.BetTableOffset, h.BetTableStoredSize,
+        var raw = ReadExtendedTable(stream, baseOffset, h.ArchiveSize, h.BetTableOffset, h.BetTableStoredSize,
             BetSignature, h.BetTableMd5, "(block table)");
         var body = raw.Body;
         if (body.Length < BetHeaderBodySize) throw new InvalidDataException("BET Header 被截断。");
@@ -244,20 +244,21 @@ public static class MpqV4ArchiveParser
     }
 
     private sealed record ExtendedData(uint Version, uint DeclaredDataSize, byte[] Body,
-        string Md5, bool Md5Valid, bool IsCompressed);
+        string Md5, bool Md5Present, bool Md5Valid, bool IsCompressed);
 
-    private static ExtendedData ReadExtendedTable(FileStream stream, long baseOffset,
+    private static ExtendedData ReadExtendedTable(FileStream stream, long baseOffset, ulong archiveSize,
         ulong relativeOffset, ulong storedSize, uint expectedSignature, string expectedMd5, string keyName)
     {
-        if (relativeOffset == 0 || storedSize < 12 || storedSize >= MaxExtendedTableSize)
-            throw new InvalidDataException("HET/BET 表偏移或压缩长度不合法。");
+        if (relativeOffset < HeaderLength || storedSize < 12 || storedSize >= MaxExtendedTableSize ||
+            relativeOffset > archiveSize || storedSize > archiveSize - relativeOffset)
+            throw new InvalidDataException("HET/BET 表偏移或压缩长度超出 MPQ v4 ArchiveSize64。");
         var absolute = checked((ulong)baseOffset + relativeOffset);
         if (absolute > (ulong)stream.Length || storedSize > (ulong)stream.Length - absolute)
             throw new InvalidDataException("HET/BET 表超出文件范围。");
         var bytes = ReadExact(stream, checked((long)absolute), checked((int)storedSize));
         var md5 = Convert.ToHexString(MD5.HashData(bytes));
-        var md5Valid = expectedMd5.All(c => c == '0') ||
-            string.Equals(md5, expectedMd5, StringComparison.OrdinalIgnoreCase);
+        var md5Present = !expectedMd5.All(c => c == '0');
+        var md5Valid = !md5Present || string.Equals(md5, expectedMd5, StringComparison.OrdinalIgnoreCase);
         if (!md5Valid)
             throw new InvalidDataException($"{(expectedSignature == HetSignature ? "HET" : "BET")} 原始表 MD5 校验失败。");
 
@@ -290,7 +291,7 @@ public static class MpqV4ArchiveParser
             body = output.ToArray();
         }
 
-        return new ExtendedData(version, declaredDataSize, body, md5, md5Valid, isCompressed);
+        return new ExtendedData(version, declaredDataSize, body, md5, md5Present, md5Valid, isCompressed);
     }
 
     private static ulong ReadBits(ReadOnlySpan<byte> bytes, ulong bitOffset, int bitCount)
