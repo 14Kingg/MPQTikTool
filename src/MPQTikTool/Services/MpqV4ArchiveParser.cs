@@ -84,6 +84,7 @@ public static class MpqV4ArchiveParser
 
         var diagnostics = new List<string> { "MPQ v4 Header MD5：通过" };
         ulong parsedHetBitsMask = 0;
+        var parsedHetNameHashBits = 0;
         TableInfo? hetInfo = null;
         TableInfo? betInfo = null;
         IReadOnlyList<BlockEntry> blocks = Array.Empty<BlockEntry>();
@@ -94,6 +95,7 @@ public static class MpqV4ArchiveParser
             var parsedHet = ReadHet(stream, headerOffset, header);
             hetInfo = parsedHet.Info;
             nameHashes = parsedHet.NameHashes;
+            parsedHetNameHashBits = parsedHet.NameHash2Bits;
             parsedHetBitsMask = parsedHet.NameHash2Bits == 64 ? ulong.MaxValue : ((1UL << parsedHet.NameHash2Bits) - 1);
             diagnostics.Add($"HET：{parsedHet.Info.TableSize} B，MD5 {(parsedHet.Info.Md5Valid ? "通过" : "失败")}，{nameHashes.Count} 个名称哈希索引");
         }
@@ -101,6 +103,8 @@ public static class MpqV4ArchiveParser
         if (header.BetTableOffset != 0 || header.BetTableStoredSize != 0)
         {
             var parsedBet = ReadBet(stream, headerOffset, header);
+            if (hetInfo is not null && parsedBet.NameHash2Bits + 8 != parsedHetNameHashBits)
+                throw new InvalidDataException("BET NameHash2 位数与 HET NameHashBitSize 不一致。");
             betInfo = parsedBet.Info;
             var lowerMask = parsedHetBitsMask;
             blocks = parsedBet.Blocks.Select(b =>
@@ -118,7 +122,7 @@ public static class MpqV4ArchiveParser
     }
 
     private sealed record ParsedHet(TableInfo Info, Dictionary<int, ulong> NameHashes, int NameHash2Bits);
-    private sealed record ParsedBet(TableInfo Info, IReadOnlyList<BlockEntry> Blocks);
+    private sealed record ParsedBet(TableInfo Info, IReadOnlyList<BlockEntry> Blocks, int NameHash2Bits);
 
     private static ParsedHet ReadHet(FileStream stream, long baseOffset, Header h)
     {
@@ -152,15 +156,19 @@ public static class MpqV4ArchiveParser
         var indexBytes = body.AsSpan(checked(HetHeaderBodySize + (int)totalCount), checked((int)indexTableSize));
         var names = new Dictionary<int, ulong>();
         var nameHash2Bits = nameHashBits - 8;
+        var occupiedCount = 0;
         for (var i = 0; i < totalCount; i++)
         {
             var hash1 = nameBytes[(int)i];
             if (hash1 == 0xFF) continue;
+            occupiedCount++;
             var betIndex = ReadBits(indexBytes, checked((ulong)i * indexBitsTotal), checked((int)indexBits));
             if (betIndex > int.MaxValue) throw new InvalidDataException("HET BET 索引超出支持范围。");
             // The lower hash bits are filled from BET after that table is decoded.
             names[(int)betIndex] = (ulong)hash1 << checked((int)nameHash2Bits);
         }
+        if (occupiedCount != entryCount)
+            throw new InvalidDataException($"HET occupied entry count mismatch：header={entryCount}，actual={occupiedCount}。");
 
         return new ParsedHet(
             new TableInfo("HET", h.HetTableOffset, h.HetTableStoredSize, raw.Version,
@@ -178,8 +186,7 @@ public static class MpqV4ArchiveParser
 
         var tableSize = U(0);
         var entryCount = U(4);
-        var unknown08 = U(8);
-        var entryBits = U(12);
+                var entryBits = U(12);
         var posIndex = U(16);
         var sizeIndex = U(20);
         var cmpIndex = U(24);
@@ -240,7 +247,7 @@ public static class MpqV4ArchiveParser
         return new ParsedBet(
             new TableInfo("BET", h.BetTableOffset, h.BetTableStoredSize, raw.Version,
                 raw.DeclaredDataSize, tableSize, raw.Md5, raw.Md5Present, raw.Md5Valid, raw.IsCompressed, true),
-            blocks);
+            blocks, checked((int)nameHashBits));
     }
 
     private sealed record ExtendedData(uint Version, uint DeclaredDataSize, byte[] Body,
