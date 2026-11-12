@@ -112,16 +112,36 @@
         </Grid></TabItem>
         <TabItem Header="MPQ 结构"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
             <TextBlock Text="MPQ 容器结构检查" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
-            <TextBlock Text="当前传统 Hash/Block Table 解析已有基础；v4 HET/BET、完整压缩掩码、CRC 全量验证、64 位偏移和大文件重建尚未完成。后续此页展示真实 Header、表项、块布局、扇区表及校验状态。" TextWrapping="Wrap" Foreground="#FFB9C2D0"/>
-            <GroupBox Header="底层能力验收" Margin="0,16,0,0" Padding="12">
-                <StackPanel>
-                    <TextBlock Text="MPQ v1 / v2 / v3 / v4 与 HET/BET"/>
-                    <TextBlock Text="Hash Table / Block Table / 扩展表"/>
-                    <TextBlock Text="扇区偏移表、加密、压缩掩码、CRC"/>
-                    <TextBlock Text="32/64 位偏移、大文件、匿名 Block 原始数据"/>
-                    <TextBlock Text="状态：按路线图逐项实现并由测试验证" Foreground="#FFFFC66D" Margin="0,8,0,0"/>
-                </StackPanel>
+            <GroupBox Header="当前档案 Header" Padding="10">
+                <TextBlock x:Name="MpqHeaderInfoText" Text="打开地图后显示实际 Header 字段、版本、ArchiveSize64 与 MD5 校验结果。" TextWrapping="Wrap" Foreground="#FFB9C2D0"/>
             </GroupBox>
+            <GroupBox Header="HET / BET 扩展表（真实解析结果）" Margin="0,12,0,0" Padding="10">
+                <DataGrid x:Name="MpqV4TablesGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" Height="150">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="表" Binding="{Binding Kind}" Width="55"/>
+                        <DataGridTextColumn Header="相对偏移" Binding="{Binding Offset, StringFormat=0x{0:X}}" Width="110"/>
+                        <DataGridTextColumn Header="存储长度" Binding="{Binding StoredSize}" Width="85"/>
+                        <DataGridTextColumn Header="DataSize" Binding="{Binding DeclaredDataSize}" Width="85"/>
+                        <DataGridTextColumn Header="解压长度" Binding="{Binding TableSize}" Width="85"/>
+                        <DataGridTextColumn Header="压缩" Binding="{Binding IsCompressed}" Width="55"/>
+                        <DataGridTextColumn Header="MD5" Binding="{Binding Md5Valid}" Width="55"/>
+                        <DataGridTextColumn Header="MD5 值" Binding="{Binding Md5}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </GroupBox>
+            <GroupBox Header="BET 重建的 Block 条目" Margin="0,12,0,0" Padding="10">
+                <DataGrid x:Name="MpqV4BlocksGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" Height="280">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="45"/>
+                        <DataGridTextColumn Header="文件偏移" Binding="{Binding FileOffset, StringFormat=0x{0:X}}" Width="130"/>
+                        <DataGridTextColumn Header="原始大小" Binding="{Binding FileSize}" Width="85"/>
+                        <DataGridTextColumn Header="压缩大小" Binding="{Binding CompressedSize}" Width="85"/>
+                        <DataGridTextColumn Header="Flags" Binding="{Binding Flags, StringFormat=0x{0:X8}}" Width="100"/>
+                        <DataGridTextColumn Header="HET/BET NameHash" Binding="{Binding NameHash, StringFormat=0x{0:X16}}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </GroupBox>
+            <TextBlock Text="提示：HET/BET 结构读取与 Block 索引重建已接入；MPQ v4 地图重建写入、压缩传统表及完整 64 位输出仍在开发中。" TextWrapping="Wrap" Foreground="#FFFFC66D" Margin="0,12,0,0"/>
         </StackPanel></ScrollViewer></TabItem>
         <TabItem Header="地图结构"><ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="18">
             <TextBlock Text="地图结构解析" FontSize="22" FontWeight="SemiBold" Margin="0,0,0,12"/>
