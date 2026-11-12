@@ -281,10 +281,17 @@ static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHe
     var bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
     // The fixture uses raw table storage sizes in the header.
     var betOffset = hetOffset + (ulong)het.Length;
-    filePos = checked((uint)(headerSize + het.Length + bet.Length));
-    // Rebuild BET with the actual data offset (same length for this deterministic fixture).
-    WriteBits(betBody.AsSpan(80, 7), 0, 32, filePos);
-    bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
+    // Rebuild until the compressed BET length and the encoded data offset stabilize.
+    for (var attempt = 0; attempt < 4; attempt++)
+    {
+        var nextFilePos = checked((uint)(headerSize + het.Length + bet.Length));
+        if (nextFilePos == filePos) break;
+        filePos = nextFilePos;
+        WriteBits(betBody.AsSpan(80, 7), 0, 32, filePos);
+        bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
+    }
+    if (filePos != headerSize + het.Length + bet.Length)
+        throw new InvalidOperationException("Compressed BET fixture offset did not stabilize.");
 
     var payload = Encoding.ASCII.GetBytes("hello");
     var output = new byte[checked((int)filePos + payload.Length)];
