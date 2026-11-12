@@ -104,7 +104,7 @@ var checks = new List<(string Name, Action Run)>
             Assert(block.FileOffset == 0x1A4 && block.FileSize == 5 && block.CompressedSize == 5,
                 "BET bit fields must decode file offset and sizes");
             Assert(block.Flags == 0x81000000u, "BET flag index must resolve to file flags");
-            Assert(block.NameHash == 0x8042UL, "HET/BET name hash fragments must be merged");
+            Assert(block.NameHash == MpqHash.HashJenkins64("test.bin", 16), "HET/BET name hash fragments must be merged");
         }
         finally { Directory.Delete(root, true); }
     }),
@@ -119,7 +119,7 @@ var checks = new List<(string Name, Action Run)>
             var parsed = MpqV4ArchiveParser.Read(file);
             Assert(parsed.HetInfo?.IsCompressed == true && parsed.BetInfo?.IsCompressed == true,
                 "both extended tables must be decompressed");
-            Assert(parsed.Blocks.Single().NameHash == 0x8042UL, "decrypted/decompressed tables must preserve name hash");
+            Assert(parsed.Blocks.Single().NameHash == MpqHash.HashJenkins64("test.bin", 16), "decrypted/decompressed tables must preserve name hash");
         }
         finally { Directory.Delete(root, true); }
     }),
@@ -142,6 +142,26 @@ var checks = new List<(string Name, Action Run)>
             try { _ = MpqV4ArchiveParser.Read(badHet); }
             catch (InvalidDataException ex) { hetRejected = ex.Message.Contains("HET 原始表 MD5"); }
             Assert(hetRejected, "bad HET raw MD5 must be rejected");
+        }
+        finally { Directory.Delete(root, true); }
+    }),
+    ("MPQ v4 archive open, HET name recovery and raw export", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MPQTikTool.SelfTest", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "v4-open.mpq");
+            var list = Path.Combine(root, "listfile.txt");
+            var payload = Encoding.ASCII.GetBytes("hello");
+            CreateV4HetBetMpq(file, corruptHeaderMd5: false, corruptHetMd5: false, compressTables: false);
+            File.WriteAllText(list, "test.bin\n", Encoding.ASCII);
+            using var archive = MpqArchive.Open(file);
+            Assert(archive.FormatDescription.Contains("MPQ v4"), "archive must report v4 format");
+            Assert(archive.AddListFile(list) == 1, "listfile must resolve the HET Jenkins hash");
+            Assert(archive.Entries.Single().OriginalName == "test.bin", "recovered filename must be attached to BET block");
+            Assert(archive.ReadAllBytes(archive.Entries.Single()).AsSpan().SequenceEqual(payload),
+                "v4 BET block must export original bytes");
         }
         finally { Directory.Delete(root, true); }
     }),
@@ -225,7 +245,8 @@ static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHe
     Write32(hetBody, 20, 0);  // extra index bits
     Write32(hetBody, 24, 1);  // effective index bits
     Write32(hetBody, 28, 1);  // index table bytes
-    hetBody[32] = 0x80;       // HET NameHash1
+    var fixtureNameHash = MpqHash.HashJenkins64("test.bin", 16);
+    hetBody[32] = (byte)(fixtureNameHash >> 8); // HET NameHash1
     hetBody[33] = 0;          // BET index 0
 
     var betBody = new byte[88];
@@ -254,7 +275,7 @@ static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHe
     WriteBits(betBody.AsSpan(80, 7), 32, 8, 5);
     WriteBits(betBody.AsSpan(80, 7), 40, 8, 5);
     WriteBits(betBody.AsSpan(80, 7), 48, 1, 0);
-    betBody[87] = 0x42; // NameHash2
+    betBody[87] = (byte)fixtureNameHash; // NameHash2
 
     var het = BuildExtTable(0x1A544548, "(hash table)", hetBody, compressTables);
     var bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
