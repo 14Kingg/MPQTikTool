@@ -131,6 +131,82 @@ internal static class MpqHash
     /// The first DWORD of the encrypted sector-offset table is always the table size,
     /// which gives enough known plaintext to solve the 32-bit key in 256 tries.
     /// </summary>
+    /// <summary>Computes the 64-bit Jenkins lookup3 hash used by MPQ HET tables.</summary>
+    public static ulong HashJenkins64(string name, uint bitSize)
+    {
+        if (bitSize is < 8 or > 64) throw new ArgumentOutOfRangeException(nameof(bitSize));
+        var normalized = name.Replace('/', '\\').ToLowerInvariant();
+        var bytes = Encoding.UTF8.GetBytes(normalized);
+        uint pc = 2, pb = 1;
+        HashLittle2(bytes, ref pc, ref pb);
+        var hash = ((ulong)pb << 32) | pc;
+        var highBit = 1UL << checked((int)bitSize - 1);
+        var mask = bitSize == 64 ? ulong.MaxValue : (1UL << checked((int)bitSize)) - 1;
+        return (hash & (mask ^ highBit)) | highBit;
+    }
+
+    private static uint RotateLeft(uint value, int bits) =>
+        (value << bits) | (value >> (32 - bits));
+
+    private static void JenkinsMix(ref uint a, ref uint b, ref uint c)
+    {
+        unchecked
+        {
+            a -= c; a ^= RotateLeft(c, 4); c += b;
+            b -= a; b ^= RotateLeft(a, 6); a += c;
+            c -= b; c ^= RotateLeft(b, 8); b += a;
+            a -= c; a ^= RotateLeft(c, 16); c += b;
+            b -= a; b ^= RotateLeft(a, 19); a += c;
+            c -= b; c ^= RotateLeft(b, 4); b += a;
+        }
+    }
+
+    private static void JenkinsFinal(ref uint a, ref uint b, ref uint c)
+    {
+        unchecked
+        {
+            c ^= b; c -= RotateLeft(b, 14);
+            a ^= c; a -= RotateLeft(c, 11);
+            b ^= a; b -= RotateLeft(a, 25);
+            c ^= b; c -= RotateLeft(b, 16);
+            a ^= c; a -= RotateLeft(c, 4);
+            b ^= a; b -= RotateLeft(a, 14);
+            c ^= b; c -= RotateLeft(b, 24);
+        }
+    }
+
+    private static void HashLittle2(ReadOnlySpan<byte> key, ref uint pc, ref uint pb)
+    {
+        unchecked
+        {
+            uint a = 0xDEADBEEF + (uint)key.Length + pc;
+            uint b = a;
+            uint c = a + pb;
+            var offset = 0;
+            var remaining = key.Length;
+            while (remaining > 12)
+            {
+                a += BinaryPrimitives.ReadUInt32LittleEndian(key.Slice(offset, 4));
+                b += BinaryPrimitives.ReadUInt32LittleEndian(key.Slice(offset + 4, 4));
+                c += BinaryPrimitives.ReadUInt32LittleEndian(key.Slice(offset + 8, 4));
+                JenkinsMix(ref a, ref b, ref c);
+                offset += 12;
+                remaining -= 12;
+            }
+            if (remaining == 0) { pc = c; pb = b; return; }
+            for (var i = 0; i < remaining; i++)
+            {
+                var value = (uint)key[offset + i];
+                if (i < 4) a += value << (8 * i);
+                else if (i < 8) b += value << (8 * (i - 4));
+                else c += value << (8 * (i - 8));
+            }
+            JenkinsFinal(ref a, ref b, ref c);
+            pc = c;
+            pb = b;
+        }
+    }
+
     /// <summary>Standard reflected CRC-32 (polynomial 0xEDB88320), as used by MPQ sector checksums.</summary>
     public static uint ComputeCrc32(ReadOnlySpan<byte> data)
     {
