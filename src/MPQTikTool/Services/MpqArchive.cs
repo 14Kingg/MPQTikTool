@@ -41,6 +41,7 @@ public sealed class MpqArchive : IDisposable
     private readonly BlockInfo[] _rawBlocks;
     private readonly Dictionary<(uint, uint), List<ArchiveEntry>> _hashLookup = new();
     private readonly List<ArchiveEntry> _entries;
+    private readonly uint? _hetNameHashBitSize;
 
     public string ArchivePath { get; }
     public string FormatDescription { get; }
@@ -48,7 +49,7 @@ public sealed class MpqArchive : IDisposable
     public long FileLength => _stream.Length;
 
     private MpqArchive(string path, FileStream stream, long headerOffset, HeaderInfo header,
-        BlockInfo[] blocks, uint[] hashTable)
+        BlockInfo[] blocks, uint[] hashTable, ulong?[]? extendedNameHashes = null, uint? hetNameHashBitSize = null)
     {
         ArchivePath = path;
         _stream = stream;
@@ -56,6 +57,7 @@ public sealed class MpqArchive : IDisposable
         _header = header;
         _rawHashTable = hashTable;
         _rawBlocks = blocks;
+        _hetNameHashBitSize = hetNameHashBitSize;
         _sectorSize = 512u << header.SectorShift;
         FormatDescription = $"MPQ v{header.Version + 1}，{header.BlockCount:N0} 个块，扇区 {_sectorSize:N0} B，头部偏移 0x{headerOffset:X}";
 
@@ -85,6 +87,7 @@ public sealed class MpqArchive : IDisposable
                 FilePos = b.FilePos,
                 Hash1 = h.H1,
                 Hash2 = h.H2,
+                ExtendedNameHash = extendedNameHashes is not null && i < extendedNameHashes.Length ? extendedNameHashes[i] : null,
                 Kind = ResourceKind.Unknown
             };
             entry.Name = MpqFormatDetector.BuildSyntheticName(i, h.H1, ResourceKind.Unknown, ".bin");
@@ -114,10 +117,32 @@ public sealed class MpqArchive : IDisposable
             {
                 var header = TryReadHeader(stream, candidate);
                 if (header is null) continue;
-                // Header version 3 is MPQ format v4. Its HET/BET tables are not
-                // interchangeable with the classic hash/block tables parsed below.
                 if (header.Value.Version >= 3)
-                    throw new NotSupportedException("检测到 MPQ v4。当前版本尚未实现 HET/BET 扩展表解析，已停止读取以避免把扩展表误当成传统表。");
+                {
+                    var v4 = MpqV4ArchiveParser.Read(stream, candidate);
+                    if (v4.BetInfo is not null)
+                    {
+                        var v4Blocks = v4.Blocks.Select(b =>
+                            new BlockInfo(b.FileOffset, b.CompressedSize, b.FileSize, b.Flags)).ToArray();
+                        var v4Header = header.Value with
+                        {
+                            HashCount = 0,
+                            BlockCount = checked((uint)v4Blocks.Length)
+                        };
+                        var hashes = v4.Blocks.Select(b => b.NameHash).ToArray();
+                        return new MpqArchive(path, stream, candidate, v4Header, v4Blocks,
+                            Array.Empty<uint>(), hashes, v4.NameHashBitSize);
+                    }
+
+                    // Some v4 archives retain only the classic tables. They are accepted
+                    // only when the stored sizes match the uncompressed legacy layouts.
+                    var rawHeader = ReadAt(stream, candidate, 0xD0);
+                    var hashStored = BinaryPrimitives.ReadUInt64LittleEndian(rawHeader.AsSpan(0x44, 8));
+                    var blockStored = BinaryPrimitives.ReadUInt64LittleEndian(rawHeader.AsSpan(0x4C, 8));
+                    if (header.Value.HashCount != 0 && hashStored != (ulong)header.Value.HashCount * 16 ||
+                        header.Value.BlockCount != 0 && blockStored != (ulong)header.Value.BlockCount * 16)
+                        throw new NotSupportedException("MPQ v4 使用压缩的传统 Hash/Block Table；当前仅支持 HET/BET 或未压缩传统表。");
+                }
                 var blocks = ReadTables(stream, candidate, header.Value, out var hashTable);
                 return new MpqArchive(path, stream, candidate, header.Value, blocks, hashTable);
             }
@@ -177,7 +202,7 @@ public sealed class MpqArchive : IDisposable
         var hashCount = Read32(0x18);
         var blockCount = Read32(0x1C);
         if (headerSize < 0x20 || headerSize > 0xD0 || shift > 20) return null;
-        if (hashCount == 0 || hashCount > (1u << 22) || blockCount == 0 || blockCount > (1u << 22)) return null;
+        if ((version < 3 && (hashCount == 0 || blockCount == 0)) || hashCount > (1u << 22) || blockCount > (1u << 22)) return null;
 
         var hashPos = (long)Read32(0x10);
         var blockPos = (long)Read32(0x14);
@@ -191,8 +216,9 @@ public sealed class MpqArchive : IDisposable
         }
 
         var available = stream.Length - offset;
-        if (hashPos < 0 || blockPos < 0 || hashPos + (long)hashCount * 16 > available ||
-            blockPos + (long)blockCount * 16 > available) return null;
+        if (hashPos < 0 || blockPos < 0 ||
+            (hashCount != 0 && (hashPos == 0 || hashPos + (long)hashCount * 16 > available)) ||
+            (blockCount != 0 && (blockPos == 0 || blockPos + (long)blockCount * 16 > available))) return null;
         if (hiBlockPos != 0 && hiBlockPos + (long)blockCount * 2 > available) return null;
 
         return new HeaderInfo(headerSize, Read32(8), version, shift, hashPos, blockPos, hashCount, blockCount, hiBlockPos);
@@ -280,9 +306,19 @@ public sealed class MpqArchive : IDisposable
             if (normalized.Length is < 4 or > 240) continue;
             foreach (var variant in NameVariants(normalized))
             {
-                var (h1, h2) = MpqHash.HashName(variant);
-                if (!_hashLookup.TryGetValue((h1, h2), out var list)) continue;
-                foreach (var entry in list)
+                IEnumerable<ArchiveEntry> matches;
+                if (_hetNameHashBitSize is uint nameHashBits)
+                {
+                    var extendedHash = MpqHash.HashJenkins64(variant, nameHashBits);
+                    matches = _entries.Where(entry => entry.ExtendedNameHash == extendedHash);
+                }
+                else
+                {
+                    var (h1, h2) = MpqHash.HashName(variant);
+                    matches = _hashLookup.TryGetValue((h1, h2), out var list)
+                        ? list : Array.Empty<ArchiveEntry>();
+                }
+                foreach (var entry in matches)
                 {
                     if (entry.NameRecovered) continue;
                     entry.OriginalName = variant;
@@ -778,6 +814,8 @@ public sealed class MpqArchive : IDisposable
     public RestoreResult RestoreTo(string targetPath, IEnumerable<string>? extraNames = null,
         bool dropClearedEditorFiles = true, CancellationToken cancellationToken = default)
     {
+        if (_header.Version >= 3)
+            throw new NotSupportedException("MPQ v4 的 HET/BET 重建写入尚未实现；为避免生成损坏地图，当前只开放资源读取与导出。");
         var listText = BuildListFile(extraNames);
         byte[] listBytes;
         try { listBytes = Encoding.GetEncoding(936).GetBytes(listText); }
