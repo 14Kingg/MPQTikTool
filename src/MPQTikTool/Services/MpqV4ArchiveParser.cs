@@ -31,7 +31,7 @@ public static class MpqV4ArchiveParser
 
     public sealed record TableInfo(string Kind, ulong Offset, ulong StoredSize,
         uint Version, uint DeclaredDataSize, uint TableSize, string Md5,
-        bool Md5Valid, bool IsCompressed, bool IsEncrypted);
+        bool Md5Present, bool Md5Valid, bool IsCompressed, bool IsEncrypted);
 
     public sealed record Result(Header MpqHeader, IReadOnlyList<BlockEntry> Blocks,
         TableInfo? HetInfo, TableInfo? BetInfo, IReadOnlyList<string> Diagnostics,
