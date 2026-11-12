@@ -289,7 +289,7 @@ static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHe
     var payload = Encoding.ASCII.GetBytes("hello");
     var output = new byte[checked((int)filePos + payload.Length)];
     var header = output.AsSpan(0, headerSize);
-    new byte[] { (byte)'M', (byte)'P', (byte)'Q', 0x1A }.CopyTo(header);
+    new byte[] { (byte)'M', (byte)'P', (byte)'Q', 0x1A }.AsSpan().CopyTo(header);
     BinaryPrimitives.WriteUInt32LittleEndian(header.Slice(4, 4), headerSize);
     BinaryPrimitives.WriteUInt32LittleEndian(header.Slice(8, 4), (uint)output.Length);
     BinaryPrimitives.WriteUInt16LittleEndian(header.Slice(12, 2), 3);
@@ -303,11 +303,11 @@ static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHe
     bet.CopyTo(output, (int)betOffset);
     payload.CopyTo(output, (int)filePos);
 
-    MD5.HashData(het).CopyTo(header.Slice(0xB0, 16));
-    MD5.HashData(bet).CopyTo(header.Slice(0xA0, 16));
+    MD5.HashData(het).AsSpan().CopyTo(header.Slice(0xB0, 16));
+    MD5.HashData(bet).AsSpan().CopyTo(header.Slice(0xA0, 16));
     if (corruptHetMd5) header[0xB0] ^= 0x80;
     var headerMd5 = MD5.HashData(header[..0xC0]);
-    headerMd5.CopyTo(header.Slice(0xC0, 16));
+    headerMd5.AsSpan().CopyTo(header.Slice(0xC0, 16));
     if (corruptHeaderMd5) header[0xC0] ^= 0x01;
     File.WriteAllBytes(path, output);
 }
