@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Security.Cryptography;
+using System.IO.Compression;
 using System.Text;
 using MPQTikTool.Services;
 
@@ -86,6 +87,64 @@ var checks = new List<(string Name, Action Run)>
         }
         finally { Directory.Delete(root, true); }
     }),
+    ("MPQ v4 header MD5 and HET/BET bit tables", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MPQTikTool.SelfTest", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "v4-het-bet.mpq");
+            CreateV4HetBetMpq(file, corruptHeaderMd5: false, corruptHetMd5: false, compressTables: false);
+            var parsed = MpqV4ArchiveParser.Read(file);
+            Assert(parsed.MpqHeader.HeaderMd5Valid, "v4 header MD5 must validate");
+            Assert(parsed.HetInfo is { Md5Valid: true } && parsed.BetInfo is { Md5Valid: true },
+                "HET and BET raw MD5 values must validate");
+            Assert(parsed.Blocks.Count == 1, "BET must reconstruct one block");
+            var block = parsed.Blocks[0];
+            Assert(block.FileOffset == 0x1A4 && block.FileSize == 5 && block.CompressedSize == 5,
+                "BET bit fields must decode file offset and sizes");
+            Assert(block.Flags == 0x81000000u, "BET flag index must resolve to file flags");
+            Assert(block.NameHash == 0x8042UL, "HET/BET name hash fragments must be merged");
+        }
+        finally { Directory.Delete(root, true); }
+    }),
+    ("MPQ v4 compressed and encrypted HET/BET tables", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MPQTikTool.SelfTest", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var file = Path.Combine(root, "v4-compressed.mpq");
+            CreateV4HetBetMpq(file, corruptHeaderMd5: false, corruptHetMd5: false, compressTables: true);
+            var parsed = MpqV4ArchiveParser.Read(file);
+            Assert(parsed.HetInfo?.IsCompressed == true && parsed.BetInfo?.IsCompressed == true,
+                "both extended tables must be decompressed");
+            Assert(parsed.Blocks.Single().NameHash == 0x8042UL, "decrypted/decompressed tables must preserve name hash");
+        }
+        finally { Directory.Delete(root, true); }
+    }),
+    ("MPQ v4 rejects bad header and HET MD5", () =>
+    {
+        var root = Path.Combine(Path.GetTempPath(), "MPQTikTool.SelfTest", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            var badHeader = Path.Combine(root, "bad-header.mpq");
+            CreateV4HetBetMpq(badHeader, corruptHeaderMd5: true, corruptHetMd5: false, compressTables: false);
+            var headerRejected = false;
+            try { _ = MpqV4ArchiveParser.Read(badHeader); }
+            catch (InvalidDataException ex) { headerRejected = ex.Message.Contains("Header MD5"); }
+            Assert(headerRejected, "bad header MD5 must be rejected");
+
+            var badHet = Path.Combine(root, "bad-het.mpq");
+            CreateV4HetBetMpq(badHet, corruptHeaderMd5: false, corruptHetMd5: true, compressTables: false);
+            var hetRejected = false;
+            try { _ = MpqV4ArchiveParser.Read(badHet); }
+            catch (InvalidDataException ex) { hetRejected = ex.Message.Contains("HET 原始表 MD5"); }
+            Assert(hetRejected, "bad HET raw MD5 must be rejected");
+        }
+        finally { Directory.Delete(root, true); }
+    }),
     ("MPQ v1 table and raw block round-trip", () =>
     {
         var root = Path.Combine(Path.GetTempPath(), "MPQTikTool.SelfTest", Guid.NewGuid().ToString("N"));
@@ -150,6 +209,118 @@ return failures.Count == 0 ? 0 : 1;
 static void Assert(bool condition, string message)
 {
     if (!condition) throw new InvalidOperationException(message);
+}
+
+
+static void CreateV4HetBetMpq(string path, bool corruptHeaderMd5, bool corruptHetMd5, bool compressTables)
+{
+    const int headerSize = 0xD0;
+    const ulong hetOffset = headerSize;
+    var hetBody = new byte[34];
+    Write32(hetBody, 0, 34);  // table size
+    Write32(hetBody, 4, 1);   // occupied entries
+    Write32(hetBody, 8, 1);   // total slots
+    Write32(hetBody, 12, 16); // name hash bits
+    Write32(hetBody, 16, 1);  // total index bits
+    Write32(hetBody, 20, 0);  // extra index bits
+    Write32(hetBody, 24, 1);  // effective index bits
+    Write32(hetBody, 28, 1);  // index table bytes
+    hetBody[32] = 0x80;       // HET NameHash1
+    hetBody[33] = 0;          // BET index 0
+
+    var betBody = new byte[88];
+    Write32(betBody, 0, 88);
+    Write32(betBody, 4, 1);
+    Write32(betBody, 8, 0x10);
+    Write32(betBody, 12, 49);
+    Write32(betBody, 16, 0);  // file pos bit index
+    Write32(betBody, 20, 32); // file size bit index
+    Write32(betBody, 24, 40); // compressed size bit index
+    Write32(betBody, 28, 48); // flag index bit index
+    Write32(betBody, 32, 49);
+    Write32(betBody, 36, 32);
+    Write32(betBody, 40, 8);
+    Write32(betBody, 44, 8);
+    Write32(betBody, 48, 1);
+    Write32(betBody, 52, 0);
+    Write32(betBody, 56, 8);  // NameHash2 stride
+    Write32(betBody, 60, 0);
+    Write32(betBody, 64, 8);  // NameHash2 effective bits
+    Write32(betBody, 68, 1);  // NameHash2 array bytes
+    Write32(betBody, 72, 1);  // flag count
+    Write32(betBody, 76, 0x81000000); // flags[0]
+    var filePos = (uint)(headerSize + 46 + 100);
+    WriteBits(betBody.AsSpan(80, 7), 0, 32, filePos);
+    WriteBits(betBody.AsSpan(80, 7), 32, 8, 5);
+    WriteBits(betBody.AsSpan(80, 7), 40, 8, 5);
+    WriteBits(betBody.AsSpan(80, 7), 48, 1, 0);
+    betBody[87] = 0x42; // NameHash2
+
+    var het = BuildExtTable(0x1A544548, "(hash table)", hetBody, compressTables);
+    var bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
+    // The fixture uses raw table storage sizes in the header.
+    var betOffset = hetOffset + (ulong)het.Length;
+    filePos = checked((uint)(headerSize + het.Length + bet.Length));
+    // Rebuild BET with the actual data offset (same length for this deterministic fixture).
+    WriteBits(betBody.AsSpan(80, 7), 0, 32, filePos);
+    bet = BuildExtTable(0x1A544542, "(block table)", betBody, compressTables);
+
+    var payload = Encoding.ASCII.GetBytes("hello");
+    var output = new byte[checked((int)filePos + payload.Length)];
+    var header = output.AsSpan(0, headerSize);
+    new byte[] { (byte)'M', (byte)'P', (byte)'Q', 0x1A }.CopyTo(header);
+    BinaryPrimitives.WriteUInt32LittleEndian(header.Slice(4, 4), headerSize);
+    BinaryPrimitives.WriteUInt32LittleEndian(header.Slice(8, 4), (uint)output.Length);
+    BinaryPrimitives.WriteUInt16LittleEndian(header.Slice(12, 2), 3);
+    BinaryPrimitives.WriteUInt16LittleEndian(header.Slice(14, 2), 3);
+    BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(0x2C, 8), (ulong)output.Length);
+    BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(0x34, 8), betOffset);
+    BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(0x3C, 8), hetOffset);
+    BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(0x5C, 8), (ulong)het.Length);
+    BinaryPrimitives.WriteUInt64LittleEndian(header.Slice(0x64, 8), (ulong)bet.Length);
+    het.CopyTo(output, (int)hetOffset);
+    bet.CopyTo(output, (int)betOffset);
+    payload.CopyTo(output, (int)filePos);
+
+    MD5.HashData(het).CopyTo(header.Slice(0xB0, 16));
+    MD5.HashData(bet).CopyTo(header.Slice(0xA0, 16));
+    if (corruptHetMd5) header[0xB0] ^= 0x80;
+    var headerMd5 = MD5.HashData(header[..0xC0]);
+    headerMd5.CopyTo(header.Slice(0xC0, 16));
+    if (corruptHeaderMd5) header[0xC0] ^= 0x01;
+    File.WriteAllBytes(path, output);
+}
+
+static byte[] BuildExtTable(uint signature, string keyName, byte[] body, bool compress)
+{
+    byte[] storedBody;
+    if (compress)
+    {
+        using var compressed = new MemoryStream();
+        compressed.WriteByte(0x02); // MPQ ZLIB compression mask
+        using (var zlib = new ZLibStream(compressed, CompressionLevel.Optimal, leaveOpen: true))
+            zlib.Write(body);
+        storedBody = compressed.ToArray();
+    }
+    else storedBody = (byte[])body.Clone();
+
+    MpqHash.EncryptInPlace(storedBody, MpqHash.HashString(keyName, 3));
+    var table = new byte[12 + storedBody.Length];
+    Write32(table, 0, signature);
+    Write32(table, 4, 1);
+    Write32(table, 8, (uint)body.Length);
+    storedBody.CopyTo(table, 12);
+    return table;
+}
+
+static void Write32(Span<byte> data, int offset, uint value) =>
+    BinaryPrimitives.WriteUInt32LittleEndian(data.Slice(offset, 4), value);
+
+static void WriteBits(Span<byte> data, int bitOffset, int bitCount, ulong value)
+{
+    for (var bit = 0; bit < bitCount; bit++)
+        if ((value & (1UL << bit)) != 0)
+            data[(bitOffset + bit) >> 3] |= (byte)(1 << ((bitOffset + bit) & 7));
 }
 
 static void CreateSectorCrcMpq(string path, byte[] payload, bool corruptCrc)
