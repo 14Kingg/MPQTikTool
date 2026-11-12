@@ -55,8 +55,10 @@ public partial class MainWindow : Window
                 var h = v4.MpqHeader;
                 MpqHeaderInfoText.Text =
                     $"格式：MPQ v4（version={h.FormatVersion}） · HeaderSize=0x{h.HeaderSize:X} · ArchiveSize64={h.ArchiveSize:N0} B · SectorShift={h.SectorShift}\n" +
+                    $"Hash：0x{h.HashTableOffset:X} / {h.HashTableStoredSize:N0} B · Block：0x{h.BlockTableOffset:X} / {h.BlockTableStoredSize:N0} B · HiBlock：0x{h.HiBlockTableOffset:X} / {h.HiBlockTableStoredSize:N0} B\n" +
                     $"HET：0x{h.HetTableOffset:X} / {h.HetTableStoredSize:N0} B · BET：0x{h.BetTableOffset:X} / {h.BetTableStoredSize:N0} B · RawChunkSize={h.RawChunkSize:N0}\n" +
-                    $"Header MD5：{(h.HeaderMd5Valid ? "通过" : "失败")} · HET MD5：{v4.HetInfo?.Md5Present switch { true => v4.HetInfo.Md5Valid ? "通过" : "失败", false => "未提供", null => "不存在" }} · BET MD5：{v4.BetInfo?.Md5Present switch { true => v4.BetInfo.Md5Valid ? "通过" : "失败", false => "未提供", null => "不存在" }}";
+                    $"Header MD5：{(h.HeaderMd5Valid ? "通过" : "失败")} · Hash MD5：{h.HashTableMd5} · Block MD5：{h.BlockTableMd5}\n" +
+                    $"Header HET MD5：{h.HetTableMd5} · BET MD5：{h.BetTableMd5}";
                 MpqV4TablesGrid.ItemsSource = new[] { v4.HetInfo, v4.BetInfo }.Where(t => t is not null).ToList();
                 MpqV4BlocksGrid.ItemsSource = v4.Blocks;
             }
