@@ -112,6 +112,8 @@ public static class MpqV4ArchiveParser
             var parsedBet = ReadBet(stream, headerOffset, header);
             if (hetInfo is not null && parsedBet.NameHash2Bits + 8 != parsedHetNameHashBits)
                 throw new InvalidDataException("BET NameHash2 位数与 HET NameHashBitSize 不一致。");
+            if (nameHashes.Keys.Any(index => index < 0 || index >= parsedBet.Blocks.Count))
+                throw new InvalidDataException("HET 表引用了不存在的 BET Block 索引。");
             betInfo = parsedBet.Info;
             var lowerMask = parsedHetBitsMask;
             blocks = parsedBet.Blocks.Select(b =>
@@ -195,7 +197,8 @@ public static class MpqV4ArchiveParser
             var betIndex = ReadBits(indexBytes, checked((ulong)i * indexBitsTotal), checked((int)indexBits));
             if (betIndex > int.MaxValue) throw new InvalidDataException("HET BET 索引超出支持范围。");
             // The lower hash bits are filled from BET after that table is decoded.
-            names[(int)betIndex] = (ulong)hash1 << checked((int)nameHash2Bits);
+            if (!names.TryAdd((int)betIndex, (ulong)hash1 << checked((int)nameHash2Bits)))
+                throw new InvalidDataException($"HET 中 BET Block 索引 {betIndex} 重复。");
         }
         if (occupiedCount != entryCount)
             throw new InvalidDataException($"HET occupied entry count mismatch：header={entryCount}，actual={occupiedCount}。");
@@ -271,6 +274,9 @@ public static class MpqV4ArchiveParser
                 ? flags[(int)flagSlot] : throw new InvalidDataException($"BET Block {i} 的 FlagIndex 越界。");
             var nameHash2 = nameHashBits == 0 ? 0UL :
                 ReadBits(nameBits, checked((ulong)i * nameHashTotalBits), checked((int)nameHashBits));
+            if ((flag & 0x80000000u) != 0 && (fileSize != 0 || compressedSize != 0) &&
+                (filePos < HeaderLength || filePos > h.ArchiveSize || compressedSize > h.ArchiveSize - filePos))
+                throw new InvalidDataException($"BET Block {i} 的 64 位文件偏移/压缩长度超出 ArchiveSize64。");
             blocks[i] = new BlockEntry(i, filePos, fileSize, compressedSize, flag, nameHash2);
         }
 
