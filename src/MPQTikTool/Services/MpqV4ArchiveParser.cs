@@ -96,7 +96,7 @@ public static class MpqV4ArchiveParser
             var parsedHet = ReadHet(stream, headerOffset, header);
             hetInfo = parsedHet.Info;
             nameHashes = parsedHet.NameHashes;
-            parsedHetNameHashBits = parsedHet.NameHash2Bits;
+            parsedHetNameHashBits = parsedHet.NameHash2Bits + 8;
             parsedHetBitsMask = parsedHet.NameHash2Bits == 64 ? ulong.MaxValue : ((1UL << parsedHet.NameHash2Bits) - 1);
             diagnostics.Add($"HET：{parsedHet.Info.TableSize} B，MD5 {(parsedHet.Info.Md5Valid ? "通过" : "失败")}，{nameHashes.Count} 个名称哈希索引");
         }
@@ -119,7 +119,7 @@ public static class MpqV4ArchiveParser
             throw new InvalidDataException("检测到 HET 表，但缺少对应 BET 表，无法重建 Block 条目。");
         }
 
-        return new Result(header, blocks, hetInfo, betInfo, diagnostics, hetInfo is null ? null : checked((uint)(parsedHetNameHashBits + 8)));
+        return new Result(header, blocks, hetInfo, betInfo, diagnostics, hetInfo is null ? null : checked((uint)parsedHetNameHashBits));
     }
 
     private sealed record ParsedHet(TableInfo Info, Dictionary<int, ulong> NameHashes, int NameHash2Bits);
