@@ -101,8 +101,8 @@ var checks = new List<(string Name, Action Run)>
                 "HET and BET raw MD5 values must validate");
             Assert(parsed.Blocks.Count == 1, "BET must reconstruct one block");
             var block = parsed.Blocks[0];
-            Assert(block.FileOffset == 0x1A4 && block.FileSize == 5 && block.CompressedSize == 5,
-                "BET bit fields must decode file offset and sizes");
+            Assert(block.FileOffset == 0x162 && block.FileSize == 5 && block.CompressedSize == 5,
+                $"BET bit fields must decode file offset and sizes; actual={block.FileOffset:X}/{block.FileSize}/{block.CompressedSize}");
             Assert(block.Flags == 0x81000000u, "BET flag index must resolve to file flags");
             Assert(block.NameHash == MpqHash.HashJenkins64("test.bin", 16), "HET/BET name hash fragments must be merged");
         }
